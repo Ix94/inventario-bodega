@@ -184,6 +184,7 @@ const CACHE = 'bodega:cache', SESION = 'bodega:usuario';
 const UBIC_BASE = ['REC-01','TRI-01','DSM-01','DSM-02','CMP-01','SCR-01','A20','A23','E7','E22','G17','S2'];
 let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
+const SOLO_VER = new URLSearchParams(location.search).has('ver');
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -205,14 +206,16 @@ const SUG = {
 
 /* ================= USUARIOS ================= */
 function sesion(){ try{ return JSON.parse(localStorage.getItem(SESION)); }catch(e){ return null; } }
-function pintarUsuario(){ $('#usuario-chip').textContent = '👤 ' + (USUARIO ? USUARIO.nombre : '—'); }
+function pintarUsuario(){ $('#usuario-chip').textContent = SOLO_VER ? '👁 Solo lectura' : ('👤 ' + (USUARIO ? USUARIO.nombre : '—')); }
 function pedirUsuario(){
+  if(SOLO_VER) return;
   const caja = $('#login-caja');
   caja.innerHTML = `<h2>¿Quién trabaja?</h2>
     <p>Todo lo que registres quedará firmado con tu nombre en la trazabilidad.</p>
     ${D.usuarios.map(u=>`<button class="ubtn" onclick="entrar('${esc(u.id)}')">
       <span class="ini">${esc(u.nombre.charAt(0).toUpperCase())}</span>${esc(u.nombre)}</button>`).join('')}
-    <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="formUsuario()">＋ Crear usuario nuevo</button>`;
+    <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="formUsuario()">＋ Crear usuario nuevo</button>
+    <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="location.search='ver'">👁 Entrar solo para ver</button>`;
   $('#login').classList.add('abierto');
 }
 function formUsuario(){
@@ -238,7 +241,7 @@ function entrar(id){
   USUARIO = u; localStorage.setItem(SESION, JSON.stringify(u));
   $('#login').classList.remove('abierto'); pintarUsuario(); render();
 }
-function cambiarUsuario(){ USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
+function cambiarUsuario(){ if(SOLO_VER){ if(confirm('¿Salir del modo solo lectura para trabajar con usuario?')) location.search=''; return; } USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
 
 /* ================= ALMACENAMIENTO ================= */
 function cacheLocal(){ try{ localStorage.setItem(CACHE, JSON.stringify(D)); }catch(e){
@@ -364,7 +367,7 @@ const miniFoto = o => o.foto ? `<img class="foto-mini" src="${esc(o.foto)}" oncl
 
 function render(){
   const v = $('#vista');
-  $('#fab').style.display = (tab==='nucleos'||tab==='partes') ? 'block':'none';
+  $('#fab').style.display = (!SOLO_VER && (tab==='nucleos'||tab==='partes')) ? 'block':'none';
   const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo (fotos incluidas). Para compartir entre teléfonos, pega la URL y la llave de Supabase en index.html (ver instrucciones).</div>` : '';
 
   if(tab==='nucleos'){
@@ -379,13 +382,13 @@ function render(){
         </div></div>
         ${chips(n.cars)}
         <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':'dispo'}">● ${esc(n.zona)}</div>
-        <div class="acciones">
+        ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formNucleo('${n.id}')">✎ Editar</button>
           <button onclick="formMover('${n.id}')">Mover</button>
           ${n.zona!=='Desmontado' ? `<button class="warn" onclick="desarmar('${n.id}')">Desarmar → partes</button>`:
             `<button class="warn" onclick="formParte('${n.id}')">+ Parte de este núcleo</button>`}
           <button class="peligro" onclick="borrar('nucleos','${n.id}')">✕</button>
-        </div>
+        </div>`}
       </div>`).join('') :
       `<div class="vacio"><b>Sin núcleos${filtro?' que coincidan':''}</b>Toca el botón naranja <b>+</b> para registrar la primera transmisión o diferencial.</div>`);
   }
@@ -403,12 +406,12 @@ function render(){
         </div></div>
         ${chips(p.cars)}
         <div class="estado ${p.venta==='Vendido'?'scrap':'dispo'}">● ${esc(p.venta||'Disponible')}</div>
-        <div class="acciones">
+        ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
           <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Marcar disponible':'Marcar vendido'}</button>
           <button class="peligro" onclick="borrar('partes','${p.id}')">✕</button>
-        </div>
+        </div>`}
       </div>`).join('') :
       `<div class="vacio"><b>Sin partes${filtro?' que coincidan':''}</b>Desarma un núcleo o toca <b>+</b> para registrar una parte suelta.</div>`);
   }
