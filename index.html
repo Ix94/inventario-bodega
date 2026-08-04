@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Inventario de Bodega</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700&family=Saira:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --concreto:#E9E6E0; --acero:#23272C; --azul:#2B5A87; --azul-osc:#1E4265;
+    --naranja:#DE5A1E; --amarillo:#F5D803; --blanco:#FFFFFF; --gris:#8A8F96;
+    --ok:#2E7D46; --rojo:#B3372B; --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:'Saira',system-ui,sans-serif;background:var(--concreto);color:var(--acero);font-size:15px}
+  #app{max-width:760px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding-bottom:76px}
+
+  header{background:var(--acero);color:var(--blanco);padding:14px 16px 12px;position:sticky;top:0;z-index:20;
+    border-bottom:4px solid var(--naranja)}
+  header h1{font-family:'Saira Condensed';font-weight:700;font-size:22px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+  header .sub{font-size:11px;color:#B9BEC5;letter-spacing:.14em;text-transform:uppercase;margin-top:3px;display:flex;justify-content:space-between;align-items:center}
+  #usuario-chip{background:#31363D;color:var(--amarillo);border:none;border-radius:20px;padding:3px 12px;font:inherit;font-size:11px;letter-spacing:.08em;cursor:pointer}
+  #syncdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gris);margin-left:6px;vertical-align:middle}
+  #modo{font-size:10px;color:#B9BEC5;letter-spacing:.05em;margin-left:6px}
+  #searchwrap{margin-top:10px;display:flex;gap:8px}
+  #search{flex:1;padding:10px 12px;border:none;border-radius:var(--radius);font:inherit;font-size:15px;background:#31363D;color:var(--blanco)}
+  #search::placeholder{color:#8A8F96}
+  #recargar{border:none;background:#31363D;color:var(--amarillo);border-radius:var(--radius);width:44px;font-size:18px;cursor:pointer}
+
+  main{flex:1;padding:14px 14px 20px}
+
+  .card{background:var(--blanco);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;
+    border-left:5px solid var(--azul);box-shadow:0 1px 3px rgba(0,0,0,.10)}
+  .card.parte{border-left-color:var(--naranja)}
+  .card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .card .cuerpo{display:flex;gap:12px;margin-top:6px}
+  .card .info{flex:1;min-width:0}
+  .foto-mini{width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid #D7D3CB;cursor:pointer;flex-shrink:0;background:#EEE}
+  .id{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:var(--azul-osc);letter-spacing:.02em}
+  .card.parte .id{color:var(--naranja)}
+  .tag{display:inline-block;background:var(--amarillo);color:#1b1b1b;font-family:'Saira Condensed';font-weight:700;
+    font-size:13px;padding:2px 9px;border-radius:3px;letter-spacing:.05em;border:1px solid #C9B300;white-space:nowrap}
+  .card h3{font-size:16px;font-weight:600}
+  .meta{font-size:13px;color:#565B62;margin-top:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .chip{background:#EEF2F6;border:1px solid #D7DEE6;border-radius:4px;padding:2px 8px;font-size:12px;color:#3C4854}
+  .estado{font-size:12px;font-weight:600;margin-top:6px}
+  .estado.dispo{color:var(--ok)} .estado.desm{color:var(--naranja)} .estado.scrap{color:var(--rojo)}
+  .acciones{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .acciones button{flex:1;min-width:90px;padding:9px 6px;border:1.5px solid var(--azul);background:transparent;color:var(--azul);
+    border-radius:7px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .acciones button.warn{border-color:var(--naranja);color:var(--naranja)}
+  .acciones button.peligro{border-color:#C9CDD2;color:var(--gris);flex:0;min-width:44px}
+  .acciones button:active{transform:scale(.97)}
+
+  .vacio{text-align:center;color:#6B7076;padding:44px 20px}
+  .vacio b{display:block;font-family:'Saira Condensed';font-size:20px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;color:#4A4F55}
+  .aviso{background:#FFF4E2;border:1.5px solid #E8B36A;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;color:#6B4A12}
+
+  nav{position:fixed;bottom:0;left:0;right:0;background:var(--acero);display:flex;z-index:30;
+    border-top:3px solid var(--azul);max-width:760px;margin:0 auto}
+  nav button{flex:1;background:none;border:none;color:#9AA0A8;padding:10px 2px 12px;font-family:'Saira Condensed';
+    font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+  nav button.on{color:var(--amarillo)}
+  nav button .ic{display:block;font-size:18px;margin-bottom:2px}
+
+  #fab{position:fixed;right:16px;bottom:86px;width:58px;height:58px;border-radius:50%;background:var(--naranja);
+    color:#fff;border:none;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:25}
+  #fab:active{transform:scale(.94)}
+
+  #hoja{position:fixed;inset:0;background:rgba(20,22,25,.55);display:none;z-index:40;overflow-y:auto}
+  #hoja.abierta{display:block}
+  #hoja .panel{background:var(--concreto);max-width:760px;margin:24px auto 0;min-height:calc(100vh - 24px);
+    border-radius:14px 14px 0 0;padding:16px 16px 40px}
+  #hoja h2{font-family:'Saira Condensed';font-size:20px;text-transform:uppercase;letter-spacing:.05em;
+    border-bottom:3px solid var(--naranja);padding-bottom:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  #hoja h2 .x{border:none;background:#D8D4CC;border-radius:7px;width:34px;height:34px;font-size:17px;cursor:pointer}
+  label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#4A4F55;margin:12px 0 4px}
+  input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid #C6C2BA;border-radius:8px;font:inherit;font-size:15px;background:var(--blanco)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--azul);border-color:var(--azul)}
+  .fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .carbloque{background:#DFDBD3;border-radius:10px;padding:10px 12px 14px;margin-top:14px}
+  .carbloque .titulo{font-family:'Saira Condensed';font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#3C4148}
+  .carfila{display:grid;grid-template-columns:5fr 6fr;gap:8px;margin-top:8px}
+  .carfila input{padding:9px 10px;font-size:14px}
+  .guardar{width:100%;margin-top:20px;padding:15px;background:var(--azul);color:#fff;border:none;border-radius:10px;
+    font-family:'Saira Condensed';font-size:17px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+  .guardar:disabled{background:#8A9AAB}
+  .guardar:active{transform:scale(.98)}
+  .nota-origen{background:var(--amarillo);border-radius:6px;padding:8px 12px;font-size:13px;font-weight:600;margin-top:10px}
+
+  /* foto en formulario */
+  .fotozona{margin-top:14px;display:flex;gap:10px;align-items:center}
+  .fotobtn{flex:1;padding:13px;border:2px dashed var(--azul);border-radius:10px;background:#F3F6F9;color:var(--azul);
+    font:inherit;font-weight:600;font-size:14px;cursor:pointer;text-align:center}
+  .foto-prev{width:84px;height:84px;object-fit:cover;border-radius:10px;border:2px solid var(--azul);display:none}
+
+  /* visor de foto */
+  #visor{position:fixed;inset:0;background:rgba(10,11,13,.92);display:none;z-index:60;align-items:center;justify-content:center;flex-direction:column;padding:16px}
+  #visor.abierto{display:flex}
+  #visor img{max-width:100%;max-height:82vh;border-radius:8px}
+  #visor .cerrar{margin-top:14px;background:var(--amarillo);border:none;border-radius:8px;padding:10px 28px;
+    font-family:'Saira Condensed';font-weight:700;font-size:15px;letter-spacing:.08em;cursor:pointer}
+
+  /* pantalla de usuario */
+  #login{position:fixed;inset:0;background:var(--acero);z-index:70;display:none;overflow-y:auto}
+  #login.abierto{display:block}
+  #login .caja{max-width:420px;margin:0 auto;padding:40px 22px}
+  #login h2{font-family:'Saira Condensed';color:var(--blanco);font-size:26px;text-transform:uppercase;letter-spacing:.06em;border-bottom:4px solid var(--naranja);padding-bottom:10px}
+  #login p{color:#B9BEC5;font-size:13px;margin:10px 0 18px}
+  .ubtn{display:block;width:100%;background:#31363D;color:var(--blanco);border:none;border-radius:10px;padding:15px;
+    font:inherit;font-size:16px;font-weight:600;text-align:left;margin-bottom:10px;cursor:pointer}
+  .ubtn:active{background:#3C4148}
+  .ubtn .ini{display:inline-block;width:34px;height:34px;background:var(--azul);border-radius:50%;text-align:center;line-height:34px;margin-right:12px;font-family:'Saira Condensed';font-weight:700}
+  #login label{color:#B9BEC5}
+  #login input{background:#31363D;border-color:#4A4F55;color:var(--blanco)}
+  #login .guardar{background:var(--naranja)}
+
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:var(--blanco);border-radius:var(--radius);padding:14px;border-top:4px solid var(--azul)}
+  .kpi.n2{border-top-color:var(--naranja)}
+  .kpi .num{font-family:'Saira Condensed';font-size:32px;font-weight:700;line-height:1}
+  .kpi .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:#565B62;margin-top:4px}
+  .exportar{width:100%;margin-top:14px;padding:13px;background:var(--acero);color:var(--amarillo);border:none;border-radius:10px;
+    font-family:'Saira Condensed';font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+  .mov{background:var(--blanco);border-radius:8px;padding:9px 12px;margin-bottom:7px;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .mov .f{color:#7A7F86;font-size:11px}
+  .seccion-t{font-family:'Saira Condensed';font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:18px 0 8px;color:#3C4148}
+  @media (min-width:600px){ .kpis{grid-template-columns:repeat(4,1fr)} }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <h1>Inventario de Bodega <span id="syncdot"></span><span id="modo"></span></h1>
+    <div class="sub"><span>Núcleos · Partes · Trazabilidad</span>
+      <button id="usuario-chip" onclick="cambiarUsuario()">👤 —</button></div>
+    <div id="searchwrap">
+      <input id="search" placeholder="Buscar por ID, modelo, ubicación, característica…">
+      <button id="recargar" title="Traer cambios de otros teléfonos">⟳</button>
+    </div>
+  </header>
+
+  <main id="vista"></main>
+
+  <button id="fab" title="Agregar">+</button>
+
+  <nav>
+    <button data-tab="nucleos" class="on"><span class="ic">⚙</span>Núcleos</button>
+    <button data-tab="partes"><span class="ic">🔩</span>Partes</button>
+    <button data-tab="movs"><span class="ic">↔</span>Movim.</button>
+    <button data-tab="resumen"><span class="ic">▦</span>Resumen</button>
+  </nav>
+</div>
+
+<div id="hoja"><div class="panel" id="panel"></div></div>
+<div id="visor" onclick="this.classList.remove('abierto')"><img id="visor-img"><button class="cerrar">Cerrar</button></div>
+<div id="login"><div class="caja" id="login-caja"></div></div>
+
+<datalist id="dl-ubic"></datalist>
+<datalist id="dl-piezas">
+  <option>Corona-Piñón</option><option>Eje Principal (Mainshaft)</option><option>Eje Contramarcha (Countershaft)</option>
+  <option>Carcasa Frontal</option><option>Carcasa Auxiliar</option><option>Eje de Entrada (Input Shaft)</option>
+  <option>Sincronizador</option><option>Engrane</option><option>Portadiferencial</option><option>Satélites y Planetarios</option>
+  <option>Bomba de Aceite</option><option>Torre de Cambios</option><option>Yugo</option><option>Rodamiento</option>
+</datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* =====================================================================
+   CONFIGURACIÓN — pega aquí los datos de TU proyecto de Supabase.
+   Los encuentras en: Supabase > Project Settings > API
+   Si los dejas vacíos, la app funciona en modo local (solo este
+   dispositivo, fotos incluidas, sin compartir entre teléfonos).
+   ===================================================================== */
+const SUPABASE_URL  = "https://dhxewgotxnxsekoreocl.supabase.co";   // ej: "https://abcdefgh.supabase.co"
+const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoeGV3Z290eG54c2Vrb3Jlb2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NTA0OTQsImV4cCI6MjEwMTQyNjQ5NH0.TzzaKExvPCnrItS0HwHwIoQVYqEWCL-oYlUR4Cut91Y";   // la llave larga que dice "anon public"
+/* ===================================================================== */
+
+const sb = (SUPABASE_URL && SUPABASE_KEY) ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const CACHE = 'bodega:cache', SESION = 'bodega:usuario';
+const UBIC_BASE = ['REC-01','TRI-01','DSM-01','DSM-02','CMP-01','SCR-01','A20','A23','E7','E22','G17','S2'];
+let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
+let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hoy = () => new Date().toISOString().slice(0,10);
+const dot = c => $('#syncdot').style.background = c;
+
+const SUG = {
+  'Transmisión':['Velocidades','Directa / Overdrive','Toma de fuerza','Bomba / Enfriador','Tipo de yugo'],
+  'Diferencial':['Relación','Dientes de corona','Dientes de piñón','Posición (del/tras)','Bloqueo'],
+  'Corona-Piñón':['Dientes corona','Dientes piñón','Relación','Diámetro corona','Espesor'],
+  'Eje Principal (Mainshaft)':['Largo','Diámetro','Estrías','Cuñero','N° de referencia'],
+  'Eje Contramarcha (Countershaft)':['Largo','Diámetro','Dientes engrane mando','Tipo (helicoidal/recto)','N° de referencia'],
+  'Eje de Entrada (Input Shaft)':['Largo','Diámetro','Estrías','Tipo (pull/push)','N° de referencia'],
+  'Engrane':['N° de dientes','Diámetro','Espesor','Estrías internas','Posición (1ra, 2da…)'],
+  'Portadiferencial':['Relación','Marca','Modelo','Estrías piñón','Estado de coronas'],
+  'Rodamiento':['N° de referencia','Diámetro interno','Diámetro externo','Espesor','Marca'],
+  _def:['Característica 1','Característica 2','Característica 3','Característica 4','Característica 5']
+};
+
+/* ================= USUARIOS ================= */
+function sesion(){ try{ return JSON.parse(localStorage.getItem(SESION)); }catch(e){ return null; } }
+function pintarUsuario(){ $('#usuario-chip').textContent = '👤 ' + (USUARIO ? USUARIO.nombre : '—'); }
+function pedirUsuario(){
+  const caja = $('#login-caja');
+  caja.innerHTML = `<h2>¿Quién trabaja?</h2>
+    <p>Todo lo que registres quedará firmado con tu nombre en la trazabilidad.</p>
+    ${D.usuarios.map(u=>`<button class="ubtn" onclick="entrar('${esc(u.id)}')">
+      <span class="ini">${esc(u.nombre.charAt(0).toUpperCase())}</span>${esc(u.nombre)}</button>`).join('')}
+    <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="formUsuario()">＋ Crear usuario nuevo</button>`;
+  $('#login').classList.add('abierto');
+}
+function formUsuario(){
+  $('#login-caja').innerHTML = `<h2>Usuario nuevo</h2>
+    <label>Nombre</label><input id="u-nombre" placeholder="Ej: Juan Pérez">
+    <label>PIN de 4 números</label><input id="u-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="Ej: 2580">
+    <button class="guardar" onclick="crearUsuario()">Crear y entrar</button>
+    <button class="ubtn" style="margin-top:10px" onclick="pedirUsuario()">← Volver</button>`;
+}
+async function crearUsuario(){
+  const nombre = $('#u-nombre').value.trim(), pin = $('#u-pin').value.trim();
+  if(!nombre || pin.length!==4){ alert('Escribe el nombre y un PIN de 4 números.'); return; }
+  const u = { id:'USR-'+nombre.toLowerCase().replace(/[^a-z0-9]/g,'-'), nombre, pin };
+  if(D.usuarios.some(x=>x.id===u.id)){ alert('Ya existe un usuario con ese nombre.'); return; }
+  D.usuarios.push(u); await persistir('usuario', u);
+  USUARIO = u; localStorage.setItem(SESION, JSON.stringify(u));
+  $('#login').classList.remove('abierto'); pintarUsuario(); render();
+}
+function entrar(id){
+  const u = D.usuarios.find(x=>x.id===id); if(!u) return;
+  const pin = prompt('PIN de ' + u.nombre + ':');
+  if(pin !== u.pin){ alert('PIN incorrecto.'); return; }
+  USUARIO = u; localStorage.setItem(SESION, JSON.stringify(u));
+  $('#login').classList.remove('abierto'); pintarUsuario(); render();
+}
+function cambiarUsuario(){ USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
+
+/* ================= ALMACENAMIENTO ================= */
+function cacheLocal(){ try{ localStorage.setItem(CACHE, JSON.stringify(D)); }catch(e){
+  alert('El almacenamiento de este teléfono está lleno (modo local guarda fotos aquí). Configura Supabase para espacio ilimitado de registros.'); } }
+function leerCacheLocal(){ try{ const v = localStorage.getItem(CACHE); if(v) D = Object.assign(D, JSON.parse(v)); }catch(e){} }
+
+async function cargar(mostrar=true){
+  $('#modo').textContent = sb ? '· BASE COMPARTIDA' : '· SOLO ESTE DISPOSITIVO';
+  leerCacheLocal();
+  USUARIO = sesion(); pintarUsuario();
+  if(mostrar) render(); pintarUbic();
+  if(!sb){ dot('#3FBF6A'); if(!USUARIO) pedirUsuario(); return; }
+  dot('#E8A400');
+  try{
+    const { data, error } = await sb.from('bodega').select('id,col,data').limit(10000);
+    if(error) throw error;
+    D = { nucleos:[], partes:[], movs:[], usuarios:[] };
+    for(const fila of data){
+      if(fila.col==='nucleo') D.nucleos.push(fila.data);
+      else if(fila.col==='parte') D.partes.push(fila.data);
+      else if(fila.col==='mov') D.movs.push(fila.data);
+      else if(fila.col==='usuario') D.usuarios.push(fila.data);
+    }
+    D.nucleos.sort((a,b)=> (b.id>a.id?1:-1));
+    D.partes.sort((a,b)=> (b.id>a.id?1:-1));
+    D.movs.sort((a,b)=> (b.ts||'').localeCompare(a.ts||''));
+    cacheLocal(); dot('#3FBF6A'); render(); pintarUbic();
+  }catch(e){ dot('#D24B3F'); console.error('Supabase:', e); }
+  if(!USUARIO) pedirUsuario();
+}
+
+async function persistir(col, obj){
+  cacheLocal();
+  if(!sb){ dot('#3FBF6A'); return; }
+  dot('#E8A400');
+  try{
+    const { error } = await sb.from('bodega').upsert({ id: obj.id, col, data: obj, updated_at: new Date().toISOString() });
+    if(error) throw error;
+    dot('#3FBF6A');
+  }catch(e){ dot('#D24B3F'); alert('No se pudo guardar en la base compartida. Revisa tu internet y toca ⟳ para reintentar.\n\nEl dato quedó guardado en este teléfono.'); }
+}
+async function eliminar(id){
+  cacheLocal();
+  if(!sb){ dot('#3FBF6A'); return; }
+  try{ await sb.from('bodega').delete().eq('id', id); dot('#3FBF6A'); }catch(e){ dot('#D24B3F'); }
+}
+
+/* ================= FOTOS =================
+   La foto se comprime en el teléfono (máx 1280px, JPEG) antes de subir:
+   pesa ~100-250 KB. Con el 1 GB gratis de Supabase Storage caben
+   miles de fotos. Sin Supabase, se guarda en el dispositivo.      */
+function comprimirFoto(file){
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const MAX = 1280;
+      let w = img.width, h = img.height;
+      if(w>h && w>MAX){ h = h*MAX/w; w = MAX; } else if(h>=w && h>MAX){ w = w*MAX/h; h = MAX; }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      c.toBlob(b => b ? res({blob:b, dataUrl:c.toDataURL('image/jpeg', .72)}) : rej('sin blob'), 'image/jpeg', .72);
+    };
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function subirFoto(id){
+  if(!fotoPend) return '';
+  if(!sb) return fotoPend.dataUrl;   // modo local: la foto vive en el teléfono
+  const ruta = `${id}_${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('fotos').upload(ruta, fotoPend.blob, { contentType:'image/jpeg' });
+  if(error){ alert('La foto no se pudo subir (¿existe el bucket "fotos"?). El registro se guardará sin foto; puedes reintentar editándolo luego.'); return ''; }
+  return sb.storage.from('fotos').getPublicUrl(ruta).data.publicUrl;
+}
+async function seleccionFoto(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoPend = await comprimirFoto(input.files[0]);
+    const p = $('#foto-prev'); p.src = fotoPend.dataUrl; p.style.display = 'block';
+    $('#fotobtn-txt').textContent = '✓ Foto lista — tocar para cambiar';
+  }catch(e){ alert('No se pudo leer la imagen. Intenta con otra foto.'); }
+}
+function verFoto(url){ $('#visor-img').src = url; $('#visor').classList.add('abierto'); }
+
+const bloqueFoto = () => `
+  <div class="fotozona">
+    <label class="fotobtn" style="margin:0">
+      <span id="fotobtn-txt">📷 Tomar foto o elegir de galería</span>
+      <input type="file" accept="image/*" capture="environment" style="display:none" onchange="seleccionFoto(this)">
+    </label>
+    <img id="foto-prev" class="foto-prev" alt="vista previa">
+  </div>`;
+
+/* IDs seguros con varios usuarios */
+function siguienteId(pref, lista){
+  let max = 0;
+  for(const o of lista){
+    const m = String(o.id||'').match(new RegExp('^'+pref+'.*?(\\d+)$'));
+    if(m) max = Math.max(max, parseInt(m[1],10));
+  }
+  return max+1;
+}
+function ubicaciones(){
+  const s = new Set(UBIC_BASE);
+  D.nucleos.forEach(n=>n.ubic&&s.add(n.ubic));
+  D.partes.forEach(p=>p.ubic&&s.add(p.ubic));
+  return [...s];
+}
+function pintarUbic(){ $('#dl-ubic').innerHTML = ubicaciones().map(u=>`<option>${esc(u)}</option>`).join(''); }
+function mov(id, origen, destino, motivo){
+  const m = { id:'MOV-'+Date.now()+'-'+Math.floor(Math.random()*1000), ts:new Date().toISOString(),
+    fecha:hoy(), ref:id, origen:origen||'—', destino, motivo, resp: USUARIO ? USUARIO.nombre : '' };
+  D.movs.unshift(m); persistir('mov', m);
+}
+
+/* ================= VISTAS ================= */
+const coincide = o => !filtro || JSON.stringify(o).toLowerCase().includes(filtro);
+function chips(cars){
+  const c = (cars||[]).filter(x=>x && x.v);
+  return c.length ? `<div class="chips">${c.map(x=>`<span class="chip">${esc(x.n)}: <b>${esc(x.v)}</b></span>`).join('')}</div>` : '';
+}
+const miniFoto = o => o.foto ? `<img class="foto-mini" src="${esc(o.foto)}" onclick="verFoto('${esc(o.foto)}')" alt="foto">` : '';
+
+function render(){
+  const v = $('#vista');
+  $('#fab').style.display = (tab==='nucleos'||tab==='partes') ? 'block':'none';
+  const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo (fotos incluidas). Para compartir entre teléfonos, pega la URL y la llave de Supabase en index.html (ver instrucciones).</div>` : '';
+
+  if(tab==='nucleos'){
+    const lista = D.nucleos.filter(coincide);
+    v.innerHTML = avisoConfig + (lista.length ? lista.map(n=>`
+      <div class="card">
+        <div class="top"><span class="id">${esc(n.id)}</span><span class="tag">${esc(n.ubic)}</span></div>
+        <div class="cuerpo">${miniFoto(n)}<div class="info">
+          <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
+          <div class="meta">${esc(n.tipo)} · Serie ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
+          <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
+        </div></div>
+        ${chips(n.cars)}
+        <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':'dispo'}">● ${esc(n.zona)}</div>
+        <div class="acciones">
+          <button onclick="formMover('${n.id}')">Mover</button>
+          ${n.zona!=='Desmontado' ? `<button class="warn" onclick="desarmar('${n.id}')">Desarmar → partes</button>`:
+            `<button class="warn" onclick="formParte('${n.id}')">+ Parte de este núcleo</button>`}
+          <button class="peligro" onclick="borrar('nucleos','${n.id}')">✕</button>
+        </div>
+      </div>`).join('') :
+      `<div class="vacio"><b>Sin núcleos${filtro?' que coincidan':''}</b>Toca el botón naranja <b>+</b> para registrar la primera transmisión o diferencial.</div>`);
+  }
+
+  if(tab==='partes'){
+    const lista = D.partes.filter(coincide);
+    v.innerHTML = avisoConfig + (lista.length ? lista.map(p=>`
+      <div class="card parte">
+        <div class="top"><span class="id">${esc(p.id)}</span><span class="tag">${esc(p.ubic)}</span></div>
+        <div class="cuerpo">${miniFoto(p)}<div class="info">
+          <h3>${esc(p.tipo)}</h3>
+          <div class="meta">Origen: <b>${esc(p.origen||'—')}</b> · ${esc(p.cond||'')}</div>
+          <div class="meta">${esc(p.fecha)} ${p.resp?'· 👤 '+esc(p.resp):''}</div>
+          ${p.precio?`<div class="meta">Precio: <b>L ${Number(p.precio).toLocaleString()}</b></div>`:''}
+        </div></div>
+        ${chips(p.cars)}
+        <div class="estado ${p.venta==='Vendido'?'scrap':'dispo'}">● ${esc(p.venta||'Disponible')}</div>
+        <div class="acciones">
+          <button onclick="formMover('${p.id}')">Mover</button>
+          <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Marcar disponible':'Marcar vendido'}</button>
+          <button class="peligro" onclick="borrar('partes','${p.id}')">✕</button>
+        </div>
+      </div>`).join('') :
+      `<div class="vacio"><b>Sin partes${filtro?' que coincidan':''}</b>Desarma un núcleo o toca <b>+</b> para registrar una parte suelta.</div>`);
+  }
+
+  if(tab==='movs'){
+    const lista = D.movs.filter(coincide);
+    v.innerHTML = `<div class="seccion-t">Historial de movimientos</div>` + (lista.length ? lista.map(m=>`
+      <div class="mov"><div class="f">${esc(m.fecha)} · ${esc(m.resp||'')}</div>
+      <b class="id">${esc(m.ref)}</b> — ${esc(m.origen)} → <b>${esc(m.destino)}</b><br>${esc(m.motivo)}</div>`).join('') :
+      `<div class="vacio"><b>Sin movimientos</b>Cada registro, traslado o desarme queda anotado aquí automáticamente.</div>`);
+  }
+
+  if(tab==='resumen'){
+    const nd = D.nucleos.length, tr = D.nucleos.filter(n=>n.tipo==='Transmisión').length;
+    const dispo = D.partes.filter(p=>p.venta!=='Vendido').length;
+    const valor = D.partes.filter(p=>p.venta!=='Vendido').reduce((s,p)=>s+(Number(p.precio)||0),0);
+    v.innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><div class="num">${nd}</div><div class="lbl">Núcleos</div></div>
+        <div class="kpi"><div class="num">${tr} / ${nd-tr}</div><div class="lbl">Transm. / Difer.</div></div>
+        <div class="kpi n2"><div class="num">${dispo}</div><div class="lbl">Partes disponibles</div></div>
+        <div class="kpi n2"><div class="num">L ${valor.toLocaleString()}</div><div class="lbl">Valor en partes</div></div>
+      </div>
+      <div class="seccion-t">Ubicaciones en uso</div>
+      <div class="chips">${ubicaciones().map(u=>{
+        const c = D.nucleos.filter(n=>n.ubic===u).length + D.partes.filter(p=>p.ubic===u).length;
+        return `<span class="tag" style="margin:2px">${esc(u)} · ${c}</span>`;}).join('')}</div>
+      <div class="seccion-t">Equipo</div>
+      <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)}</span>`).join('') || '<span class="meta">Sin usuarios aún</span>'}</div>
+      <button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (CSV)</button>
+      <div class="meta" style="margin-top:8px">El archivo exportado se abre directamente en Excel y sirve de respaldo semanal.</div>`;
+  }
+}
+
+/* ================= FORMULARIOS ================= */
+function abrirHoja(html){ fotoPend = null; $('#panel').innerHTML = html; $('#hoja').classList.add('abierta'); window.scrollTo(0,0); }
+function cerrarHoja(){ $('#hoja').classList.remove('abierta'); }
+
+function camposCars(nombres){
+  return `<div class="carbloque"><div class="titulo">5 características</div>
+    ${[0,1,2,3,4].map(i=>`<div class="carfila">
+      <input id="cn${i}" placeholder="Nombre" value="${esc(nombres[i]||'')}">
+      <input id="cv${i}" placeholder="Valor / medida">
+    </div>`).join('')}</div>`;
+}
+const leerCars = () => [0,1,2,3,4].map(i=>({n:$('#cn'+i).value.trim(), v:$('#cv'+i).value.trim()}));
+function ponSug(t){ const s = SUG[t]||SUG._def; [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value = s[i]||''; }); }
+
+function formNucleo(){
+  abrirHoja(`
+    <h2>Nuevo núcleo <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    ${bloqueFoto()}
+    <label>Tipo</label>
+    <select id="f-tipo" onchange="ponSug(this.value)">
+      <option>Transmisión</option><option>Diferencial</option>
+    </select>
+    <div class="fila2">
+      <div><label>Marca</label><input id="f-marca" placeholder="Eaton Fuller, Rockwell…"></div>
+      <div><label>Modelo</label><input id="f-modelo" placeholder="FRO-15210C"></div>
+    </div>
+    <div class="fila2">
+      <div><label>N° serie</label><input id="f-serie"></div>
+      <div><label>Ubicación / estante</label><input id="f-ubic" list="dl-ubic" placeholder="A20, TRI-01…"></div>
+    </div>
+    <label>Estado visual</label><input id="f-estado" placeholder="Corrosión leve, carcasa íntegra…">
+    ${camposCars(SUG['Transmisión'])}
+    <label>Notas</label><textarea id="f-notas" rows="2"></textarea>
+    <button class="guardar" id="btn-g" onclick="guardarNucleo(this)">Guardar núcleo</button>`);
+}
+async function guardarNucleo(btn){
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const tipo = $('#f-tipo').value, pref = tipo==='Transmisión'?'TR':'DF';
+  const f = hoy();
+  const id = `${pref}-${f.slice(0,7)}-${String(siguienteId(pref, D.nucleos)).padStart(4,'0')}`;
+  const foto = await subirFoto(id);
+  const ubic = ($('#f-ubic').value.trim().toUpperCase()) || 'REC-01';
+  const n = { id, tipo, fecha:f, marca:$('#f-marca').value.trim(), modelo:$('#f-modelo').value.trim(),
+    serie:$('#f-serie').value.trim(), estado:$('#f-estado').value.trim(), cars:leerCars(), foto,
+    ubic, zona:'Recibido', resp: USUARIO ? USUARIO.nombre : '', notas:$('#f-notas').value.trim() };
+  D.nucleos.unshift(n); await persistir('nucleo', n);
+  mov(id, 'Ingreso', ubic, 'Registro de núcleo recibido');
+  cerrarHoja(); tab='nucleos'; marcarTab(); render(); pintarUbic();
+}
+
+function formParte(origen){
+  abrirHoja(`
+    <h2>Nueva parte <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    ${origen?`<div class="nota-origen">Origen: núcleo ${esc(origen)} — la trazabilidad queda ligada.</div>`:''}
+    ${bloqueFoto()}
+    <label>Tipo de pieza</label>
+    <input id="p-tipo" list="dl-piezas" placeholder="Corona-Piñón, Eje Principal…" onchange="ponSug(this.value)">
+    ${origen?'':`<label>ID núcleo de origen (opcional)</label><input id="p-origen" placeholder="TR-2026-08-0001">`}
+    <div class="fila2">
+      <div><label>Condición</label>
+        <select id="p-cond"><option>Usado - Buen estado</option><option>Usado - Regular</option><option>Reparación requerida</option><option>Nuevo</option></select></div>
+      <div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>
+    </div>
+    <label>Ubicación / estante (Rack-Nivel-Pos)</label><input id="p-ubic" list="dl-ubic" placeholder="A3-02-05, E22…">
+    ${camposCars(SUG['Corona-Piñón'])}
+    <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
+    <button class="guardar" onclick="guardarParte(this,'${origen||''}')">Guardar parte</button>`);
+}
+async function guardarParte(btn, origen){
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const id = `PRT-${String(siguienteId('PRT', D.partes)).padStart(4,'0')}`;
+  const foto = await subirFoto(id);
+  const ubic = ($('#p-ubic').value.trim().toUpperCase()) || 'DSM-01';
+  const orig = origen || ($('#p-origen') ? $('#p-origen').value.trim() : '');
+  const p = { id, origen:orig, tipo:$('#p-tipo').value.trim()||'Pieza', cond:$('#p-cond').value,
+    precio:$('#p-precio').value, cars:leerCars(), foto, ubic, fecha:hoy(), venta:'Disponible',
+    resp: USUARIO ? USUARIO.nombre : '', notas:$('#p-notas').value.trim() };
+  D.partes.unshift(p); await persistir('parte', p);
+  mov(id, orig?('Desarme '+orig):'Ingreso', ubic, 'Parte clasificada y almacenada');
+  cerrarHoja(); tab='partes'; marcarTab(); render(); pintarUbic();
+}
+
+function desarmar(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  if(!confirm(`Desarmar ${id}: el núcleo pasa a "Desmontado" y podrás registrar sus partes. ¿Continuar?`)) return;
+  n.zona = 'Desmontado'; persistir('nucleo', n);
+  mov(id, n.ubic, n.ubic, 'Inicio de desarme — se convierte en partes');
+  render(); formParte(id);
+}
+function formMover(id){
+  const col = D.nucleos.find(x=>x.id===id) ? 'nucleo' : 'parte';
+  const o = D.nucleos.find(x=>x.id===id) || D.partes.find(x=>x.id===id); if(!o) return;
+  const destino = prompt(`Mover ${id}\nUbicación actual: ${o.ubic}\n\nNueva ubicación / estante:`);
+  if(!destino) return;
+  const d = destino.trim().toUpperCase();
+  mov(id, o.ubic, d, 'Traslado en bodega');
+  o.ubic = d; persistir(col, o); render(); pintarUbic();
+}
+function marcarVendido(id){
+  const p = D.partes.find(x=>x.id===id); if(!p) return;
+  p.venta = p.venta==='Vendido' ? 'Disponible':'Vendido';
+  if(p.venta==='Vendido') mov(id, p.ubic, 'VENTA', 'Parte vendida');
+  persistir('parte', p); render();
+}
+function borrar(col,id){
+  if(!confirm(`¿Eliminar ${id}? Esta acción no se puede deshacer.`)) return;
+  D[col] = D[col].filter(x=>x.id!==id);
+  eliminar(id); render();
+}
+
+/* ================= EXPORTAR CSV ================= */
+const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',') + '\n';
+function exportar(){
+  let s = '\uFEFFNÚCLEOS\n';
+  s += csvLinea(['ID','Tipo','Fecha','Marca','Modelo','Serie','Estado','Car1','Car2','Car3','Car4','Car5','Ubicación','Zona','Responsable','Foto','Notas']);
+  D.nucleos.forEach(n=> s += csvLinea([n.id,n.tipo,n.fecha,n.marca,n.modelo,n.serie,n.estado,
+    ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5), n.ubic,n.zona,n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]));
+  s += '\nPARTES\n';
+  s += csvLinea(['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Ubicación','Fecha','Precio (Lps)','Estado','Responsable','Foto','Notas']);
+  D.partes.forEach(p=> s += csvLinea([p.id,p.origen,p.tipo,p.cond,
+    ...(p.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5), p.ubic,p.fecha,p.precio,p.venta,p.resp,(p.foto&&p.foto.startsWith('http'))?p.foto:'',p.notas]));
+  s += '\nMOVIMIENTOS\n';
+  s += csvLinea(['Fecha','ID','Origen','Destino','Motivo','Responsable']);
+  D.movs.forEach(m=> s += csvLinea([m.fecha,m.ref,m.origen,m.destino,m.motivo,m.resp]));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));
+  a.download = `inventario_bodega_${hoy()}.csv`; a.click();
+}
+
+/* ================= NAVEGACIÓN ================= */
+function marcarTab(){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
+document.querySelectorAll('nav button').forEach(b=> b.onclick = ()=>{ tab=b.dataset.tab; marcarTab(); render(); });
+$('#fab').onclick = ()=> tab==='partes' ? formParte('') : formNucleo();
+$('#search').oninput = e=>{ filtro = e.target.value.toLowerCase(); render(); };
+$('#recargar').onclick = ()=> cargar();
+$('#hoja').onclick = e=>{ if(e.target.id==='hoja') cerrarHoja(); };
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && sb) cargar(false); });
+
+cargar();
+</script>
+</body>
+</html>
