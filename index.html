@@ -380,6 +380,7 @@ function render(){
         ${chips(n.cars)}
         <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':'dispo'}">● ${esc(n.zona)}</div>
         <div class="acciones">
+          <button onclick="formNucleo('${n.id}')">✎ Editar</button>
           <button onclick="formMover('${n.id}')">Mover</button>
           ${n.zona!=='Desmontado' ? `<button class="warn" onclick="desarmar('${n.id}')">Desarmar → partes</button>`:
             `<button class="warn" onclick="formParte('${n.id}')">+ Parte de este núcleo</button>`}
@@ -403,6 +404,7 @@ function render(){
         ${chips(p.cars)}
         <div class="estado ${p.venta==='Vendido'?'scrap':'dispo'}">● ${esc(p.venta||'Disponible')}</div>
         <div class="acciones">
+          <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
           <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Marcar disponible':'Marcar vendido'}</button>
           <button class="peligro" onclick="borrar('partes','${p.id}')">✕</button>
@@ -455,9 +457,10 @@ function camposCars(nombres){
 const leerCars = () => [0,1,2,3,4].map(i=>({n:$('#cn'+i).value.trim(), v:$('#cv'+i).value.trim()}));
 function ponSug(t){ const s = SUG[t]||SUG._def; [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value = s[i]||''; }); }
 
-function formNucleo(){
+function formNucleo(editId){
+  const e = editId ? D.nucleos.find(x=>x.id===editId) : null;
   abrirHoja(`
-    <h2>Nuevo núcleo <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <h2>${e ? 'Editar '+esc(e.id) : 'Nuevo núcleo'} <button class="x" onclick="cerrarHoja()">✕</button></h2>
     ${bloqueFoto()}
     <label>Tipo</label>
     <select id="f-tipo" onchange="ponSug(this.value)">
@@ -474,10 +477,33 @@ function formNucleo(){
     <label>Estado visual</label><input id="f-estado" placeholder="Corrosión leve, carcasa íntegra…">
     ${camposCars(SUG['Transmisión'])}
     <label>Notas</label><textarea id="f-notas" rows="2"></textarea>
-    <button class="guardar" id="btn-g" onclick="guardarNucleo(this)">Guardar núcleo</button>`);
+    <button class="guardar" id="btn-g" onclick="guardarNucleo(this,'${editId||''}')">${e ? 'Guardar cambios' : 'Guardar núcleo'}</button>`);
+  if(e){
+    $('#f-tipo').value = e.tipo || 'Transmisión';
+    $('#f-marca').value = e.marca || ''; $('#f-modelo').value = e.modelo || '';
+    $('#f-serie').value = e.serie || ''; $('#f-ubic').value = e.ubic || '';
+    $('#f-estado').value = e.estado || ''; $('#f-notas').value = e.notas || '';
+    [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value=''; $('#cv'+i).value=''; });
+    (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value = c.n||''; $('#cv'+i).value = c.v||''; });
+    if(e.foto){ const p = $('#foto-prev'); p.src = e.foto; p.style.display = 'block';
+      $('#fotobtn-txt').textContent = '✓ Ya tiene foto — tocar para cambiar'; }
+  }
 }
-async function guardarNucleo(btn){
+async function guardarNucleo(btn, editId){
   btn.disabled = true; btn.textContent = 'Guardando…';
+  if(editId){
+    const n = D.nucleos.find(x=>x.id===editId);
+    if(!n){ cerrarHoja(); return; }
+    const nuevaFoto = await subirFoto(editId);
+    if(nuevaFoto) n.foto = nuevaFoto;
+    const ubicAnt = n.ubic;
+    n.tipo = $('#f-tipo').value; n.marca = $('#f-marca').value.trim(); n.modelo = $('#f-modelo').value.trim();
+    n.serie = $('#f-serie').value.trim(); n.estado = $('#f-estado').value.trim(); n.cars = leerCars();
+    n.ubic = $('#f-ubic').value.trim() || n.ubic; n.notas = $('#f-notas').value.trim();
+    await persistir('nucleo', n);
+    if(n.ubic !== ubicAnt) mov(editId, ubicAnt, n.ubic, 'Cambio de ubicación (edición)');
+    cerrarHoja(); render(); pintarUbic(); return;
+  }
   const tipo = $('#f-tipo').value, pref = tipo==='Transmisión'?'TR':'DF';
   const f = hoy();
   const id = `${pref}-${f.slice(0,7)}-${String(siguienteId(pref, D.nucleos)).padStart(4,'0')}`;
@@ -521,6 +547,43 @@ async function guardarParte(btn, origen){
   D.partes.unshift(p); await persistir('parte', p);
   mov(id, orig?('Desarme '+orig):'Ingreso', ubic, 'Parte clasificada y almacenada');
   cerrarHoja(); tab='partes'; marcarTab(); render(); pintarUbic();
+}
+
+function formEditarParte(id){
+  const e = D.partes.find(x=>x.id===id); if(!e) return;
+  abrirHoja(`
+    <h2>Editar ${esc(e.id)} <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    ${bloqueFoto()}
+    <label>Tipo de pieza</label>
+    <input id="p-tipo" list="dl-piezas">
+    <div class="fila2">
+      <div><label>Condición</label>
+        <select id="p-cond"><option>Usado - Buen estado</option><option>Usado - Regular</option><option>Reparación requerida</option><option>Nuevo</option></select></div>
+      <div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>
+    </div>
+    <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic">
+    ${camposCars([])}
+    <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
+    <button class="guardar" onclick="guardarEdicionParte(this,'${id}')">Guardar cambios</button>`);
+  $('#p-tipo').value = e.tipo || ''; $('#p-cond').value = e.cond || 'Usado - Buen estado';
+  $('#p-precio').value = e.precio || ''; $('#p-ubic').value = e.ubic || ''; $('#p-notas').value = e.notas || '';
+  (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value = c.n||''; $('#cv'+i).value = c.v||''; });
+  if(e.foto){ const p = $('#foto-prev'); p.src = e.foto; p.style.display = 'block';
+    $('#fotobtn-txt').textContent = '✓ Ya tiene foto — tocar para cambiar'; }
+}
+async function guardarEdicionParte(btn, id){
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const p = D.partes.find(x=>x.id===id);
+  if(!p){ cerrarHoja(); return; }
+  const nuevaFoto = await subirFoto(id);
+  if(nuevaFoto) p.foto = nuevaFoto;
+  const ubicAnt = p.ubic;
+  p.tipo = $('#p-tipo').value.trim() || p.tipo; p.cond = $('#p-cond').value;
+  p.precio = $('#p-precio').value; p.cars = leerCars();
+  p.ubic = $('#p-ubic').value.trim() || p.ubic; p.notas = $('#p-notas').value.trim();
+  await persistir('parte', p);
+  if(p.ubic !== ubicAnt) mov(id, ubicAnt, p.ubic, 'Cambio de ubicación (edición)');
+  cerrarHoja(); render(); pintarUbic();
 }
 
 function desarmar(id){
