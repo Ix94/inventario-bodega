@@ -185,6 +185,7 @@ const UBIC_BASE = ['REC-01','TRI-01','DSM-01','DSM-02','CMP-01','SCR-01','A20','
 let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
 const SOLO_VER = new URLSearchParams(location.search).has('ver');
+const ADMIN_ID = 'USR-ixel-flores';   // único usuario autorizado a crear usuarios
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -214,23 +215,32 @@ function pedirUsuario(){
     <p>Todo lo que registres quedará firmado con tu nombre en la trazabilidad.</p>
     ${D.usuarios.map(u=>`<button class="ubtn" onclick="entrar('${esc(u.id)}')">
       <span class="ini">${esc(u.nombre.charAt(0).toUpperCase())}</span>${esc(u.nombre)}</button>`).join('')}
-    <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="formUsuario()">＋ Crear usuario nuevo</button>
     <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="location.search='ver'">👁 Entrar solo para ver</button>`;
   $('#login').classList.add('abierto');
 }
 function formUsuario(){
+  if(!(USUARIO && USUARIO.id===ADMIN_ID) && D.usuarios.length>0){
+    alert('Solo el administrador puede crear usuarios.'); return;
+  }
   $('#login-caja').innerHTML = `<h2>Usuario nuevo</h2>
     <label>Nombre</label><input id="u-nombre" placeholder="Ej: Juan Pérez">
     <label>PIN de 4 números</label><input id="u-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="Ej: 2580">
-    <button class="guardar" onclick="crearUsuario()">Crear y entrar</button>
-    <button class="ubtn" style="margin-top:10px" onclick="pedirUsuario()">← Volver</button>`;
+    <button class="guardar" onclick="crearUsuario()">Crear usuario</button>
+    <button class="ubtn" style="margin-top:10px" onclick="USUARIO?$('#login').classList.remove('abierto'):pedirUsuario()">← Volver</button>`;
 }
 async function crearUsuario(){
+  const esAdmin = USUARIO && USUARIO.id===ADMIN_ID;
+  if(!esAdmin && D.usuarios.length>0){ alert('Solo el administrador puede crear usuarios.'); return; }
   const nombre = $('#u-nombre').value.trim(), pin = $('#u-pin').value.trim();
   if(!nombre || pin.length!==4){ alert('Escribe el nombre y un PIN de 4 números.'); return; }
   const u = { id:'USR-'+nombre.toLowerCase().replace(/[^a-z0-9]/g,'-'), nombre, pin };
   if(D.usuarios.some(x=>x.id===u.id)){ alert('Ya existe un usuario con ese nombre.'); return; }
   D.usuarios.push(u); await persistir('usuario', u);
+  if(esAdmin){
+    $('#login').classList.remove('abierto');
+    alert('Usuario "'+nombre+'" creado ✓. Ya puede entrar con su nombre y PIN.');
+    return;
+  }
   USUARIO = u; localStorage.setItem(SESION, JSON.stringify(u));
   $('#login').classList.remove('abierto'); pintarUsuario(); render();
 }
@@ -241,7 +251,20 @@ function entrar(id){
   USUARIO = u; localStorage.setItem(SESION, JSON.stringify(u));
   $('#login').classList.remove('abierto'); pintarUsuario(); render();
 }
-function cambiarUsuario(){ if(SOLO_VER){ if(confirm('¿Salir del modo solo lectura para trabajar con usuario?')) location.search=''; return; } USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
+function cambiarUsuario(){
+  if(SOLO_VER){ if(confirm('¿Salir del modo solo lectura para trabajar con usuario?')) location.search=''; return; }
+  if(USUARIO && USUARIO.id===ADMIN_ID){
+    $('#login-caja').innerHTML = `<h2>Administración</h2>
+      <p>Hola ${esc(USUARIO.nombre)} — eres el administrador.</p>
+      <button class="ubtn" onclick="formUsuario()">＋ Crear usuario nuevo</button>
+      <button class="ubtn" onclick="salirUsuario()">Cambiar de usuario</button>
+      <button class="ubtn" style="margin-top:10px;border:2px dashed #4A4F55;background:transparent" onclick="$('#login').classList.remove('abierto')">← Volver a la app</button>`;
+    $('#login').classList.add('abierto');
+    return;
+  }
+  salirUsuario();
+}
+function salirUsuario(){ USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
 
 /* ================= ALMACENAMIENTO ================= */
 function cacheLocal(){ try{ localStorage.setItem(CACHE, JSON.stringify(D)); }catch(e){
