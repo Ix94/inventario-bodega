@@ -219,7 +219,7 @@
     <p id="confirm-msg">Esta acción no se puede deshacer.</p>
     <div class="btns">
       <button class="cancelar" onclick="cerrarConfirm()">Cancelar</button>
-      <button class="confirmar" id="confirm-ok">Eliminar</button>
+      <button class="confirmar" id="confirm-ok" onclick="ejecutarConfirm()">Eliminar</button>
     </div>
   </div>
 </div>
@@ -420,12 +420,15 @@ function pedirConfirm(titulo, msg, cb){
   confirmCallback = cb;
   $('#confirm-overlay').classList.add('abierto');
 }
-function cerrarConfirm(){ $('#confirm-overlay').classList.remove('abierto'); confirmCallback = null; }
-$('#confirm-ok').onclick = ()=>{
-  const cb = confirmCallback;  // guardar ANTES de cerrar (cerrarConfirm lo pone en null)
+function cerrarConfirm(){
+  $('#confirm-overlay').classList.remove('abierto');
+  confirmCallback = null;
+}
+function ejecutarConfirm(){
+  const cb = confirmCallback;
   cerrarConfirm();
   if(cb) cb();
-};
+}
 
 /* =====================================================================
    ALMACENAMIENTO
