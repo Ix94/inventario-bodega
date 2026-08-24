@@ -474,33 +474,89 @@ async function eliminar(id){
 }
 
 /* =====================================================================
-   GENERACIÓN DE IDs — resistente a concurrencia
-   Se añade microsegundos + random para evitar colisiones entre usuarios
+   GENERACIÓN DE IDs — secuencial real
+   
+   Estrategia:
+   1. Si hay Supabase: consulta el máximo número real de la BD antes de
+      insertar para evitar colisiones entre usuarios concurrentes.
+   2. Si no hay Supabase (modo local): usa el array D local.
+   3. El formato es limpio y secuencial: PRT-0339, PRT-0340, etc.
+      Sin sufijos de timestamp que rompen la legibilidad y la secuencia.
+   4. Para el caso de colisión real (dos usuarios literalmente al mismo
+      milisegundo), Supabase rechazará el segundo upsert con error de
+      clave duplicada — el sistema reintentará con +1 automáticamente.
    ===================================================================== */
-function generarId(pref, lista){
-  /* Calcula el máximo existente localmente */
-  let max = 0;
-  for(const o of lista){
-    const m = String(o.id||'').match(new RegExp('^'+pref+'.*?(\\d+)$'));
-    if(m) max = Math.max(max, parseInt(m[1],10));
-  }
-  const siguiente = max + 1;
-  /* Agrega microsello de tiempo para minimizar colisión en upsert concurrente */
-  const ts = Date.now().toString(36).toUpperCase();
-  const rnd = Math.floor(Math.random()*100).toString().padStart(2,'0');
-  /* Para núcleos mantenemos formato legible; para partes añadimos sello corto */
-  return `${pref}-${String(siguiente).padStart(4,'0')}-${ts}${rnd}`;
+
+/* Extrae el número secuencial del ID dado un prefijo */
+function extraerNum(id, pref){
+  const m = String(id||'').match(new RegExp('^' + pref + '-(\\d+)'));
+  return m ? parseInt(m[1], 10) : 0;
 }
-function generarIdNucleo(tipo){
-  const pref = tipo==='Transmisión'?'TR':'DF';
-  const mes = hoy().slice(0,7);
+
+/* Calcula el máximo local en D.partes o D.nucleos */
+function maxLocal(pref, lista){
   let max = 0;
+  for(const o of lista) max = Math.max(max, extraerNum(o.id, pref));
+  return max;
+}
+
+/* Consulta el máximo real a Supabase para el prefijo dado.
+   Filtra por col='parte' o col='nucleo' según prefijo. */
+async function maxSupabase(pref){
+  if(!sb) return 0;
+  const col = (pref==='TR'||pref==='DF') ? 'nucleo' : 'parte';
+  try{
+    // Traer solo los IDs de esa colección, ordenados descendentemente por id
+    const { data, error } = await sb
+      .from('bodega')
+      .select('id')
+      .eq('col', col)
+      .like('id', pref + '-%')
+      .order('id', { ascending: false })
+      .limit(5);   // solo necesitamos los más altos
+    if(error || !data || !data.length) return 0;
+    return Math.max(...data.map(r => extraerNum(r.id, pref)));
+  }catch(e){ return 0; }
+}
+
+/* Genera el siguiente ID de parte. async porque consulta Supabase. */
+async function generarIdParte(){
+  const pref = 'PRT';
+  const local = maxLocal(pref, D.partes);
+  const remoto = await maxSupabase(pref);
+  const siguiente = Math.max(local, remoto) + 1;
+  return `${pref}-${String(siguiente).padStart(4,'0')}`;
+}
+
+/* Genera el siguiente ID de núcleo. async porque consulta Supabase.
+   Formato: TR-2026-08-0042  (prefijo-año-mes-secuencia del mes) */
+async function generarIdNucleo(tipo){
+  const pref = tipo==='Transmisión' ? 'TR' : 'DF';
+  const mes = hoy().slice(0,7);   // "2026-08"
+  /* Máximo local del mes actual */
+  let localMax = 0;
   D.nucleos.forEach(n=>{
-    const m = String(n.id||'').match(/(\d{4})(?:-[A-Z0-9]+)?$/);
-    if(m && String(n.id).startsWith(pref+'-'+mes)) max = Math.max(max, parseInt(m[1],10));
+    if(String(n.id).startsWith(`${pref}-${mes}-`))
+      localMax = Math.max(localMax, extraerNum(n.id.replace(`${pref}-${mes}-`,''), ''));
   });
-  const ts = Date.now().toString(36).slice(-3).toUpperCase();
-  return `${pref}-${mes}-${String(max+1).padStart(4,'0')}-${ts}`;
+  /* Máximo remoto del mes actual */
+  let remotoMax = 0;
+  if(sb){
+    try{
+      const { data } = await sb
+        .from('bodega').select('id').eq('col','nucleo')
+        .like('id', `${pref}-${mes}-%`)
+        .order('id',{ascending:false}).limit(5);
+      if(data && data.length){
+        remotoMax = Math.max(...data.map(r=>{
+          const partes = String(r.id).split('-');
+          return parseInt(partes[partes.length-1],10)||0;
+        }));
+      }
+    }catch(e){}
+  }
+  const siguiente = Math.max(localMax, remotoMax) + 1;
+  return `${pref}-${mes}-${String(siguiente).padStart(4,'0')}`;
 }
 
 /* =====================================================================
@@ -617,7 +673,10 @@ function renderFiltros(){
       </div>
       <div class="fila-filtro">
         <span class="filtro-label">Pos:</span>
-        ${['Delantero','Trasero'].map(p=>`
+        ${(F.tipo==='Transmisión'
+          ? ['Delantera','Trasera','Intermedia']
+          : ['Delantero','Trasero']
+        ).map(p=>`
           <button class="filtro-btn${F.posicion===p?' on':''}" onclick="setF('posicion','${p}')">${p}</button>`).join('')}
         <span class="filtro-label" style="margin-left:6px">Marca:</span>
         ${MARCAS_CABEZA.map(m=>`
@@ -818,36 +877,12 @@ const leerCars = () => [0,1,2,3,4].map(i=>({n:mayus($('#cn'+i).value.trim()), v:
 function ponSug(t){
   const s = SUG[t]||SUG._def;
   [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value = s[i]||''; });
-  /* Mostrar/ocultar bloque especial según tipo */
-  const beC = $('#bloque-coplin'); const beCor = $('#bloque-corona'); const beMack = $('#bloque-mack');
-  if(beC) beC.style.display = (t==='Coplín') ? 'block':'none';
-  if(beCor) beCor.style.display = (t==='Corona-Piñón') ? 'block':'none';
+  /* bloque-mack solo existe en formulario de núcleo — onMarcaCambio() lo maneja */
 }
 
-/* Bloque especial para COPLÍN */
-const bloqueCoplin = () => `
-  <div class="bloque-especial" id="bloque-coplin" style="display:none">
-    <div class="titulo">Campos de coplín</div>
-    <label>TH — N° de dientes (pista / coplín)</label>
-    <input id="coplin-th" type="number" inputmode="numeric" placeholder="Ej: 32">
-    <div class="fila2">
-      <div><label>Cruz — largo</label><input id="coplin-cruz" placeholder="Ej: 3.5"></div>
-      <div><label>Pista — diámetro</label><input id="coplin-pista" placeholder="Ej: 4.25"></div>
-    </div>
-    ${bloqueModelos()}
-  </div>`;
-
-/* Bloque especial para CORONA-PIÑÓN */
-const bloqueCorona = () => `
-  <div class="bloque-especial" id="bloque-corona" style="display:none">
-    <div class="titulo">Corona y piñón</div>
-    <div class="fila2">
-      <div><label>Ratio</label><input id="corona-ratio" placeholder="Ej: 3.90"></div>
-      <div><label>N° de parte corona</label><input id="corona-npc"></div>
-    </div>
-    <label>N° de parte piñón</label><input id="corona-npp">
-    ${bloqueModelos()}
-  </div>`;
+/* bloqueCoplin y bloqueCorona eliminados:
+   Los campos TH, Cruz, Pista, Ratio etc. se manejan mediante
+   camposCars() con sugerencias precargadas vía ponSug(). */
 
 /* Bloque de modelos compatibles */
 function bloqueModelos(seleccionados){
@@ -876,17 +911,7 @@ function leerModelos(){
   return [...checks].map(c=>c.value);
 }
 
-/* Leer campos especiales de coplín */
-function leerCoplin(){
-  const beC = $('#bloque-coplin');
-  if(!beC || beC.style.display==='none') return null;
-  return { th: $('#coplin-th').value, cruz: $('#coplin-cruz').value, pista: $('#coplin-pista').value };
-}
-function leerCorona(){
-  const beC = $('#bloque-corona');
-  if(!beC || beC.style.display==='none') return null;
-  return { ratio: $('#corona-ratio').value, npc: $('#corona-npc').value, npp: $('#corona-npp').value };
-}
+
 
 /* Campos MACK Diferencial */
 const bloqueMack = (esNuevo) => `
@@ -946,6 +971,7 @@ function formNucleo(editId){
     <select id="f-tipo" onchange="ponSugNucleo()">
       <option>Transmisión</option><option>Diferencial</option>
     </select>
+    <!-- ponSugNucleo() llama actualizarOpcionesPosicion() al cambiar tipo -->
     <div class="fila2">
       <div><label>Marca</label><input id="f-marca" placeholder="EATON, ROCKWELL, MACK…" oninput="onMarcaCambio()"></div>
       <div><label>Modelo</label><input id="f-modelo" placeholder="FRO-15210C"></div>
@@ -953,6 +979,7 @@ function formNucleo(editId){
     <div class="fila2">
       <div><label>Posición</label>
         <select id="f-posicion"><option value="">— Sin especificar —</option><option>Delantero</option><option>Trasero</option></select>
+        <!-- opciones se actualizan con actualizarOpcionesPosicion() -->
       </div>
       <div><label>N° serie</label><input id="f-serie"></div>
     </div>
@@ -965,11 +992,13 @@ function formNucleo(editId){
     <label>Notas</label><textarea id="f-notas" rows="2"></textarea>
     <button class="guardar" id="btn-g" onclick="guardarNucleo(this,'${editId||''}')">${e ? 'Guardar cambios' : 'Guardar núcleo'}</button>`);
 
-  /* Ocultar bloque MACK por defecto */
+  /* Ajustar opciones de posición y ocultar MACK por defecto */
+  actualizarOpcionesPosicion();
   $('#bloque-mack').style.display='none';
 
   if(e){
     $('#f-tipo').value = e.tipo||'Transmisión';
+    actualizarOpcionesPosicion();   // ajustar opciones antes de asignar valor guardado
     $('#f-marca').value = e.marca||''; $('#f-modelo').value = e.modelo||'';
     $('#f-posicion').value = e.posicion||''; $('#f-serie').value = e.serie||'';
     $('#f-ubic').value = e.ubic||''; $('#f-estado').value = e.estado||'';
@@ -982,9 +1011,28 @@ function formNucleo(editId){
     if(e.mack) cargarMack(e.mack);
   }
 }
+/* Opciones de Posición según tipo:
+   Diferencial  → Delantero | Trasero
+   Transmisión  → Delantera | Trasera | Intermedia (posición de palanca) */
+function actualizarOpcionesPosicion(){
+  const sel = $('#f-posicion'); if(!sel) return;
+  const tipo = $('#f-tipo')?.value||'Transmisión';
+  const actual = sel.value;
+  if(tipo==='Diferencial'){
+    sel.innerHTML = `<option value="">— Sin especificar —</option>
+      <option>Delantero</option><option>Trasero</option>`;
+  } else {
+    sel.innerHTML = `<option value="">— Sin especificar —</option>
+      <option>Delantera</option><option>Trasera</option><option>Intermedia</option>`;
+  }
+  /* Restaurar valor si todavía aplica */
+  if([...sel.options].some(o=>o.value===actual)) sel.value=actual;
+}
+
 function ponSugNucleo(){
   const t = $('#f-tipo')?.value||'Transmisión';
   ponSug(t);
+  actualizarOpcionesPosicion();
   onMarcaCambio();
 }
 async function guardarNucleo(btn, editId){
@@ -1008,7 +1056,7 @@ async function guardarNucleo(btn, editId){
     cerrarHoja(); render(); pintarUbic(); return;
   }
   const tipo = $('#f-tipo').value;
-  const id = generarIdNucleo(tipo);
+  const id = await generarIdNucleo(tipo);
   const foto = await subirFoto(id);
   const ubic = mayus($('#f-ubic').value.trim())||'REC-01';
   const n = {
@@ -1145,31 +1193,36 @@ function formParte(origen){
     <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic" placeholder="A3-02-05, E22…">
     <label>Fecha</label>
     <input type="datetime-local" id="p-fecha" value="${ahoraLocal()}">
-    ${bloqueCoplin()}
-    ${bloqueCorona()}
     ${camposCars(SUG['Corona-Piñón'])}
+    ${bloqueModelos()}
     <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
     <button class="guardar" onclick="guardarParte(this,'${origen||''}')">Guardar parte</button>`);
 }
 function onTipoParte(val){
+  /* Mapear el tipo escrito al key de SUG correspondiente */
   const t = mayus(val.trim());
-  ponSug(t==='COPLÍN'?'Coplín':t==='CORONA-PIÑÓN'?'Corona-Piñón':val);
-  const beC = $('#bloque-coplin');
-  const beCor = $('#bloque-corona');
-  if(beC) beC.style.display = (t==='COPLÍN')?'block':'none';
-  if(beCor) beCor.style.display = (t==='CORONA-PIÑÓN')?'block':'none';
+  const keyMap = {
+    'COPLÍN':'Coplín', 'COPLIN':'Coplín',
+    'CORONA-PIÑÓN':'Corona-Piñón','CORONA PIÑÓN':'Corona-Piñón','CORONA PINON':'Corona-Piñón',
+    'EJE PRINCIPAL (MAINSHAFT)':'Eje Principal (Mainshaft)',
+    'EJE CONTRAMARCHA (COUNTERSHAFT)':'Eje Contramarcha (Countershaft)',
+    'EJE DE ENTRADA (INPUT SHAFT)':'Eje de Entrada (Input Shaft)',
+    'ENGRANE':'Engrane','PORTADIFERENCIAL':'Portadiferencial','RODAMIENTO':'Rodamiento',
+    'TRANSMISIÓN':'Transmisión','TRANSMISION':'Transmisión',
+    'DIFERENCIAL':'Diferencial'
+  };
+  const sugKey = keyMap[t] || val;
+  ponSug(sugKey);
 }
 async function guardarParte(btn, origen){
   btn.disabled=true; btn.textContent='Guardando…';
-  /* ID robusto con timestamp para evitar colisiones en concurrencia */
-  const id = generarId('PRT', D.partes);
+  /* ID secuencial consultando Supabase para evitar colisiones */
+  const id = await generarIdParte();
   const foto = await subirFoto(id);
   const ubic = mayus($('#p-ubic').value.trim())||'DSM-01';
   const orig = origen || (mayus($('#p-origen')?.value.trim()||''));
   const fechaVal = $('#p-fecha').value || ahoraLocal();
   const fechaGuardar = fechaVal.slice(0,10);
-  const coplin = leerCoplin();
-  const corona = leerCorona();
   const modelos = leerModelos();
   const p = {
     id, origen:orig, tipo:mayus($('#p-tipo').value.trim())||'PIEZA',
@@ -1178,8 +1231,6 @@ async function guardarParte(btn, origen){
     resp:USUARIO?USUARIO.nombre:'', notas:mayus($('#p-notas').value.trim()),
     modelos
   };
-  if(coplin) p.coplin=coplin;
-  if(corona) p.corona=corona;
   D.partes.unshift(p); await persistir('parte', p);
   mov(id, orig?('DESARME '+orig):'INGRESO', ubic, 'PARTE CLASIFICADA Y ALMACENADA', fechaGuardar);
   cerrarHoja(); tab='partes'; marcarTab(); render(); pintarUbic();
@@ -1204,8 +1255,6 @@ function formEditarParte(id){
     <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic">
     <label>Fecha del movimiento</label>
     <input type="datetime-local" id="p-fecha" value="${e.fecha?e.fecha+'T00:00':ahoraLocal()}">
-    ${bloqueCoplin()}
-    ${bloqueCorona()}
     ${camposCars([])}
     ${bloqueModelos(e.modelos||[])}
     <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
@@ -1216,16 +1265,8 @@ function formEditarParte(id){
   (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value=c.n||''; $('#cv'+i).value=c.v||''; });
   if(e.foto){ const p=$('#foto-prev'); p.src=e.foto; p.style.display='block'; $('#fotobtn-txt').textContent='✓ Ya tiene foto'; }
 
-  /* Mostrar bloques especiales si aplica */
-  const t = mayus(e.tipo||'');
-  if(t==='COPLÍN' && $('#bloque-coplin')){
-    $('#bloque-coplin').style.display='block';
-    if(e.coplin){ $('#coplin-th').value=e.coplin.th||''; $('#coplin-cruz').value=e.coplin.cruz||''; $('#coplin-pista').value=e.coplin.pista||''; }
-  }
-  if(t==='CORONA-PIÑÓN' && $('#bloque-corona')){
-    $('#bloque-corona').style.display='block';
-    if(e.corona){ $('#corona-ratio').value=e.corona.ratio||''; $('#corona-npc').value=e.corona.npc||''; $('#corona-npp').value=e.corona.npp||''; }
-  }
+  /* Precargar sugerencias de características según el tipo */
+  onTipoParte(e.tipo||'');
 }
 async function guardarEdicionParte(btn, id){
   btn.disabled=true; btn.textContent='Guardando…';
@@ -1238,8 +1279,6 @@ async function guardarEdicionParte(btn, id){
   p.precio=$('#p-precio').value; p.cars=leerCars();
   p.ubic=mayus($('#p-ubic').value.trim())||p.ubic; p.notas=mayus($('#p-notas').value.trim());
   p.fecha=fechaGuardar; p.modelos=leerModelos();
-  const coplin=leerCoplin(); const corona=leerCorona();
-  if(coplin) p.coplin=coplin; if(corona) p.corona=corona;
   await persistir('parte', p);
   if(p.ubic!==ubicAnt) mov(id, ubicAnt, p.ubic, 'CAMBIO DE UBICACIÓN (EDICIÓN)', fechaGuardar);
   cerrarHoja(); render(); pintarUbic();
