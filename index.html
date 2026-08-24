@@ -9,11 +9,14 @@
   :root{
     --concreto:#E9E6E0; --acero:#23272C; --azul:#2B5A87; --azul-osc:#1E4265;
     --naranja:#DE5A1E; --amarillo:#F5D803; --blanco:#FFFFFF; --gris:#8A8F96;
-    --ok:#2E7D46; --rojo:#B3372B; --radius:10px;
+    --ok:#2E7D46; --rojo:#B3372B; --morado:#6B3FA0; --radius:10px;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{font-family:'Saira',system-ui,sans-serif;background:var(--concreto);color:var(--acero);font-size:15px}
+  /* Forzar mayúsculas en todos los campos de texto del usuario */
+  input:not([type="number"]):not([type="tel"]):not([type="file"]):not([type="datetime-local"]),
+  textarea { text-transform:uppercase; }
   #app{max-width:760px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding-bottom:76px}
 
   header{background:var(--acero);color:var(--blanco);padding:14px 16px 12px;position:sticky;top:0;z-index:20;
@@ -24,46 +27,63 @@
   #syncdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gris);margin-left:6px;vertical-align:middle}
   #modo{font-size:10px;color:#B9BEC5;letter-spacing:.05em;margin-left:6px}
   #searchwrap{margin-top:10px;display:flex;gap:8px}
-  #search{flex:1;padding:10px 12px;border:none;border-radius:var(--radius);font:inherit;font-size:15px;background:#31363D;color:var(--blanco)}
-  #search::placeholder{color:#8A8F96}
+  #search{flex:1;padding:10px 12px;border:none;border-radius:var(--radius);font:inherit;font-size:15px;background:#31363D;color:var(--blanco);text-transform:uppercase}
+  #search::placeholder{color:#8A8F96;text-transform:none}
   #recargar{border:none;background:#31363D;color:var(--amarillo);border-radius:var(--radius);width:44px;font-size:18px;cursor:pointer}
+
+  /* ── FILTROS ── */
+  #filtros-wrap{background:#1C2026;padding:8px 14px 10px;display:flex;flex-direction:column;gap:6px}
+  .fila-filtro{display:flex;gap:6px;flex-wrap:wrap}
+  .filtro-btn{background:#31363D;color:#9AA0A8;border:1.5px solid #3C4148;border-radius:20px;
+    padding:5px 13px;font:inherit;font-size:12px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all .15s}
+  .filtro-btn.on{background:var(--azul);color:#fff;border-color:var(--azul)}
+  .filtro-btn.marca-on{background:var(--naranja);color:#fff;border-color:var(--naranja)}
+  .filtro-label{font-size:10px;color:#6B7076;letter-spacing:.1em;text-transform:uppercase;align-self:center;padding-left:2px}
 
   main{flex:1;padding:14px 14px 20px}
 
   .card{background:var(--blanco);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;
     border-left:5px solid var(--azul);box-shadow:0 1px 3px rgba(0,0,0,.10)}
   .card.parte{border-left-color:var(--naranja)}
+  .card.remfg{border-left-color:var(--morado)}
   .card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
   .card .cuerpo{display:flex;gap:12px;margin-top:6px}
   .card .info{flex:1;min-width:0}
   .foto-mini{width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid #D7D3CB;cursor:pointer;flex-shrink:0;background:#EEE}
   .id{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:var(--azul-osc);letter-spacing:.02em}
   .card.parte .id{color:var(--naranja)}
+  .card.remfg .id{color:var(--morado)}
   .tag{display:inline-block;background:var(--amarillo);color:#1b1b1b;font-family:'Saira Condensed';font-weight:700;
     font-size:13px;padding:2px 9px;border-radius:3px;letter-spacing:.05em;border:1px solid #C9B300;white-space:nowrap}
+  .tag.remfg-tag{background:var(--morado);color:#fff;border-color:#52307A}
   .card h3{font-size:16px;font-weight:600}
   .meta{font-size:13px;color:#565B62;margin-top:2px}
   .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
   .chip{background:#EEF2F6;border:1px solid #D7DEE6;border-radius:4px;padding:2px 8px;font-size:12px;color:#3C4854}
   .estado{font-size:12px;font-weight:600;margin-top:6px}
   .estado.dispo{color:var(--ok)} .estado.desm{color:var(--naranja)} .estado.scrap{color:var(--rojo)}
+  .estado.remfg-est{color:var(--morado)}
   .acciones{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .acciones button{flex:1;min-width:90px;padding:9px 6px;border:1.5px solid var(--azul);background:transparent;color:var(--azul);
     border-radius:7px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
   .acciones button.warn{border-color:var(--naranja);color:var(--naranja)}
+  .acciones button.morado{border-color:var(--morado);color:var(--morado)}
   .acciones button.peligro{border-color:#C9CDD2;color:var(--gris);flex:0;min-width:44px}
+  .acciones button.peligro-sup{border-color:var(--rojo);color:var(--rojo);flex:0;min-width:44px}
   .acciones button:active{transform:scale(.97)}
 
   .vacio{text-align:center;color:#6B7076;padding:44px 20px}
   .vacio b{display:block;font-family:'Saira Condensed';font-size:20px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;color:#4A4F55}
   .aviso{background:#FFF4E2;border:1.5px solid #E8B36A;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;color:#6B4A12}
+  .aviso-morado{background:#F3EEF9;border:1.5px solid #9B59D0;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;color:#4A2080}
 
   nav{position:fixed;bottom:0;left:0;right:0;background:var(--acero);display:flex;z-index:30;
     border-top:3px solid var(--azul);max-width:760px;margin:0 auto}
   nav button{flex:1;background:none;border:none;color:#9AA0A8;padding:10px 2px 12px;font-family:'Saira Condensed';
-    font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+    font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
   nav button.on{color:var(--amarillo)}
-  nav button .ic{display:block;font-size:18px;margin-bottom:2px}
+  nav button .ic{display:block;font-size:17px;margin-bottom:2px}
 
   #fab{position:fixed;right:16px;bottom:86px;width:58px;height:58px;border-radius:50%;background:var(--naranja);
     color:#fff;border:none;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:25}
@@ -80,6 +100,7 @@
   input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid #C6C2BA;border-radius:8px;font:inherit;font-size:15px;background:var(--blanco)}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--azul);border-color:var(--azul)}
   .fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fila3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
   .carbloque{background:#DFDBD3;border-radius:10px;padding:10px 12px 14px;margin-top:14px}
   .carbloque .titulo{font-family:'Saira Condensed';font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#3C4148}
   .carfila{display:grid;grid-template-columns:5fr 6fr;gap:8px;margin-top:8px}
@@ -88,7 +109,22 @@
     font-family:'Saira Condensed';font-size:17px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
   .guardar:disabled{background:#8A9AAB}
   .guardar:active{transform:scale(.98)}
+  .guardar.morado{background:var(--morado)}
   .nota-origen{background:var(--amarillo);border-radius:6px;padding:8px 12px;font-size:13px;font-weight:600;margin-top:10px}
+  .nota-remfg{background:#EDE5F7;border:1.5px solid var(--morado);border-radius:6px;padding:8px 12px;font-size:13px;font-weight:600;margin-top:10px;color:#4A2080}
+
+  /* campos especiales de coplín */
+  .bloque-especial{background:#E8F0F8;border:1.5px solid #B0C8E0;border-radius:10px;padding:12px;margin-top:12px}
+  .bloque-especial .titulo{font-family:'Saira Condensed';font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--azul-osc);margin-bottom:8px}
+  .bloque-especial input,.bloque-especial select{background:#fff}
+
+  /* modelos compatibles multiselect */
+  .modelos-wrap{background:#F5F3EF;border:1.5px solid #C6C2BA;border-radius:8px;padding:8px;margin-top:4px;max-height:130px;overflow-y:auto}
+  .modelos-wrap label{margin:0;font-size:13px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--acero);display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer}
+  .modelos-wrap input[type=checkbox]{width:auto;padding:0;margin:0}
+  .modelos-add{display:flex;gap:6px;margin-top:6px}
+  .modelos-add input{flex:1;padding:7px 10px;font-size:13px}
+  .modelos-add button{padding:7px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 
   /* foto en formulario */
   .fotozona{margin-top:14px;display:flex;gap:10px;align-items:center}
@@ -113,13 +149,26 @@
     font:inherit;font-size:16px;font-weight:600;text-align:left;margin-bottom:10px;cursor:pointer}
   .ubtn:active{background:#3C4148}
   .ubtn .ini{display:inline-block;width:34px;height:34px;background:var(--azul);border-radius:50%;text-align:center;line-height:34px;margin-right:12px;font-family:'Saira Condensed';font-weight:700}
+  .ubtn .rol-chip{float:right;font-size:11px;background:#23272C;padding:2px 8px;border-radius:10px;margin-top:2px}
+  .rol-admin{color:var(--amarillo)} .rol-sup{color:#7EC8FF} .rol-op{color:#9AA0A8}
   #login label{color:#B9BEC5}
   #login input{background:#31363D;border-color:#4A4F55;color:var(--blanco)}
   #login .guardar{background:var(--naranja)}
 
+  /* confirmación de borrado */
+  #confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+  #confirm-overlay.abierto{display:flex}
+  #confirm-box{background:var(--blanco);border-radius:14px;padding:22px 20px;max-width:380px;width:100%;text-align:center}
+  #confirm-box h3{font-family:'Saira Condensed';font-size:18px;text-transform:uppercase;color:var(--rojo);margin-bottom:10px}
+  #confirm-box p{font-size:14px;color:#4A4F55;margin-bottom:16px;line-height:1.5}
+  #confirm-box .btns{display:flex;gap:10px}
+  #confirm-box .btns button{flex:1;padding:12px;border:none;border-radius:8px;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  #confirm-box .btns .cancelar{background:#EEE;color:var(--acero)}
+  #confirm-box .btns .confirmar{background:var(--rojo);color:#fff}
+
   .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .kpi{background:var(--blanco);border-radius:var(--radius);padding:14px;border-top:4px solid var(--azul)}
-  .kpi.n2{border-top-color:var(--naranja)}
+  .kpi.n2{border-top-color:var(--naranja)} .kpi.n3{border-top-color:var(--morado)}
   .kpi .num{font-family:'Saira Condensed';font-size:32px;font-weight:700;line-height:1}
   .kpi .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:#565B62;margin-top:4px}
   .exportar{width:100%;margin-top:14px;padding:13px;background:var(--acero);color:var(--amarillo);border:none;border-radius:10px;
@@ -138,10 +187,13 @@
     <div class="sub"><span>Núcleos · Partes · Trazabilidad</span>
       <button id="usuario-chip" onclick="cambiarUsuario()">👤 —</button></div>
     <div id="searchwrap">
-      <input id="search" placeholder="Buscar por ID, modelo, ubicación, característica…">
+      <input id="search" placeholder="Buscar ID, modelo, ubicación…">
       <button id="recargar" title="Traer cambios de otros teléfonos">⟳</button>
     </div>
   </header>
+
+  <!-- BLOQUE DE FILTROS — se actualiza según la pestaña activa -->
+  <div id="filtros-wrap"></div>
 
   <main id="vista"></main>
 
@@ -150,6 +202,7 @@
   <nav>
     <button data-tab="nucleos" class="on"><span class="ic">⚙</span>Núcleos</button>
     <button data-tab="partes"><span class="ic">🔩</span>Partes</button>
+    <button data-tab="remfg"><span class="ic">🔧</span>Re-Mfg</button>
     <button data-tab="movs"><span class="ic">↔</span>Movim.</button>
     <button data-tab="resumen"><span class="ic">▦</span>Resumen</button>
   </nav>
@@ -159,86 +212,158 @@
 <div id="visor" onclick="this.classList.remove('abierto')"><img id="visor-img"><button class="cerrar">Cerrar</button></div>
 <div id="login"><div class="caja" id="login-caja"></div></div>
 
+<!-- Overlay de confirmación de borrado -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <h3 id="confirm-titulo">¿Eliminar?</h3>
+    <p id="confirm-msg">Esta acción no se puede deshacer.</p>
+    <div class="btns">
+      <button class="cancelar" onclick="cerrarConfirm()">Cancelar</button>
+      <button class="confirmar" id="confirm-ok">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <datalist id="dl-ubic"></datalist>
 <datalist id="dl-piezas">
-  <option>Corona-Piñón</option><option>Eje Principal (Mainshaft)</option><option>Eje Contramarcha (Countershaft)</option>
-  <option>Carcasa Frontal</option><option>Carcasa Auxiliar</option><option>Eje de Entrada (Input Shaft)</option>
-  <option>Sincronizador</option><option>Engrane</option><option>Portadiferencial</option><option>Satélites y Planetarios</option>
+  <option>Coplín</option><option>Corona-Piñón</option><option>Eje Principal (Mainshaft)</option>
+  <option>Eje Contramarcha (Countershaft)</option><option>Carcasa Frontal</option><option>Carcasa Auxiliar</option>
+  <option>Eje de Entrada (Input Shaft)</option><option>Sincronizador</option><option>Engrane</option>
+  <option>Portadiferencial</option><option>Satélites y Planetarios</option>
   <option>Bomba de Aceite</option><option>Torre de Cambios</option><option>Yugo</option><option>Rodamiento</option>
+  <option>Bull Gear</option><option>Atravesado</option>
 </datalist>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 /* =====================================================================
-   CONFIGURACIÓN — pega aquí los datos de TU proyecto de Supabase.
-   Los encuentras en: Supabase > Project Settings > API
-   Si los dejas vacíos, la app funciona en modo local (solo este
-   dispositivo, fotos incluidas, sin compartir entre teléfonos).
+   CONFIGURACIÓN SUPABASE
    ===================================================================== */
-const SUPABASE_URL  = "https://dhxewgotxnxsekoreocl.supabase.co";   // ej: "https://abcdefgh.supabase.co"
-const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoeGV3Z290eG54c2Vrb3Jlb2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NTA0OTQsImV4cCI6MjEwMTQyNjQ5NH0.TzzaKExvPCnrItS0HwHwIoQVYqEWCL-oYlUR4Cut91Y";   // la llave larga que dice "anon public"
-/* ===================================================================== */
+const SUPABASE_URL = "https://dhxewgotxnxsekoreocl.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoeGV3Z290eG54c2Vrb3Jlb2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NTA0OTQsImV4cCI6MjEwMTQyNjQ5NH0.TzzaKExvPCnrItS0HwHwIoQVYqEWCL-oYlUR4Cut91Y";
 
 const sb = (SUPABASE_URL && SUPABASE_KEY) ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const CACHE = 'bodega:cache', SESION = 'bodega:usuario';
-const UBIC_BASE = ['REC-01','TRI-01','DSM-01','DSM-02','CMP-01','SCR-01','A20','A23','E7','E22','G17','S2'];
+const UBIC_BASE = ['REC-01','TALLER ZAPOTAL','TRI-01','DSM-01','DSM-02','CMP-01','SCR-01','A20','A23','E7','E22','G17','S2'];
+
+/* ── ROLES: 'admin' | 'supervisor' | 'operador' ── */
+const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador' };
+const ADMIN_ID = 'USR-ixel-flores';
+
 let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
-const SOLO_VER = new URLSearchParams(location.search).has('ver');
-const ADMIN_ID = 'USR-ixel-flores';   // único usuario autorizado a crear usuarios
+let confirmCallback = null;
 
+/* ── FILTROS STATE ── */
+let F = {
+  tipo: '',      // 'Transmisión' | 'Diferencial'
+  posicion: '',  // 'Delantero' | 'Trasero'
+  marca: '',     // 'MERITOR'|'EATON'|'INTERNATIONAL'|'MACK'
+  parteTipo: '', // texto libre por tipo de pieza
+  car1: '', car2: '', car3: ''
+};
+
+/* Mapa de marcas cabeza → submarcas que incluye */
+const MARCAS_MAPA = {
+  'MERITOR':      ['MERITOR','ROCKWELL'],
+  'EATON':        ['EATON','DANA','SPICER','FULLER','PFIZER'],
+  'INTERNATIONAL':['INTERNATIONAL'],
+  'MACK':         ['MACK']
+};
+const MARCAS_CABEZA = Object.keys(MARCAS_MAPA);
+
+/* Lista maestra de modelos compatibles (ampliable por el usuario) */
+let MODELOS_LISTA = JSON.parse(localStorage.getItem('bodega:modelos') || '[]');
+if(!MODELOS_LISTA.length) MODELOS_LISTA = [
+  'KENWORTH T800','KENWORTH T600','PETERBILT 379','PETERBILT 389',
+  'FREIGHTLINER FLD','FREIGHTLINER CASCADIA','INTERNATIONAL 9400',
+  'VOLVO VNL','MACK CH613','WESTERN STAR 4900'
+];
+
+const SOLO_VER = new URLSearchParams(location.search).has('ver');
 const $ = s => document.querySelector(s);
 const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mayus = s => String(s??'').toUpperCase();
+/* Fecha/hora actual como string para datetime-local */
+const ahoraLocal = () => {
+  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+};
 const hoy = () => new Date().toISOString().slice(0,10);
 const dot = c => $('#syncdot').style.background = c;
 
+/* ── SUGERENCIAS DE CARACTERÍSTICAS ── */
 const SUG = {
-  'Transmisión':['Velocidades','Directa / Overdrive','Toma de fuerza','Bomba / Enfriador','Tipo de yugo'],
-  'Diferencial':['Relación','Dientes de corona','Dientes de piñón','Posición (del/tras)','Bloqueo'],
-  'Corona-Piñón':['Dientes corona','Dientes piñón','Relación','Diámetro corona','Espesor'],
-  'Eje Principal (Mainshaft)':['Largo','Diámetro','Estrías','Cuñero','N° de referencia'],
-  'Eje Contramarcha (Countershaft)':['Largo','Diámetro','Dientes engrane mando','Tipo (helicoidal/recto)','N° de referencia'],
-  'Eje de Entrada (Input Shaft)':['Largo','Diámetro','Estrías','Tipo (pull/push)','N° de referencia'],
-  'Engrane':['N° de dientes','Diámetro','Espesor','Estrías internas','Posición (1ra, 2da…)'],
-  'Portadiferencial':['Relación','Marca','Modelo','Estrías piñón','Estado de coronas'],
-  'Rodamiento':['N° de referencia','Diámetro interno','Diámetro externo','Espesor','Marca'],
-  _def:['Característica 1','Característica 2','Característica 3','Característica 4','Característica 5']
+  'Transmisión':   ['VELOCIDADES','DIRECTA / OVERDRIVE','TOMA DE FUERZA','BOMBA / ENFRIADOR','TIPO DE YUGO'],
+  'Diferencial':   ['RELACIÓN','DIENTES DE CORONA','DIENTES DE PIÑÓN','POSICIÓN (DEL/TRAS)','BLOQUEO'],
+  'Coplín':        ['TH (DIENTES)','CRUZ (LARGO)','PISTA (DIÁMETRO)','MODELOS COMPATIBLES',''],
+  'Corona-Piñón':  ['RATIO','N° CORONA','N° PIÑÓN','MODELOS COMPATIBLES',''],
+  'Eje Principal (Mainshaft)':['LARGO','DIÁMETRO','ESTRÍAS','CUÑERO','N° DE REFERENCIA'],
+  'Eje Contramarcha (Countershaft)':['LARGO','DIÁMETRO','DIENTES ENGRANE MANDO','TIPO (HELICOIDAL/RECTO)','N° DE REFERENCIA'],
+  'Eje de Entrada (Input Shaft)':['LARGO','DIÁMETRO','ESTRÍAS','TIPO (PULL/PUSH)','N° DE REFERENCIA'],
+  'Engrane':       ['N° DE DIENTES','DIÁMETRO','ESPESOR','ESTRÍAS INTERNAS','POSICIÓN (1RA, 2DA…)'],
+  'Portadiferencial':['RELACIÓN','MARCA','MODELO','ESTRÍAS PIÑÓN','ESTADO DE CORONAS'],
+  'Rodamiento':    ['N° DE REFERENCIA','DIÁMETRO INTERNO','DIÁMETRO EXTERNO','ESPESOR','MARCA'],
+  _def:['CARACTERÍSTICA 1','CARACTERÍSTICA 2','CARACTERÍSTICA 3','CARACTERÍSTICA 4','CARACTERÍSTICA 5']
 };
 
-/* ================= USUARIOS ================= */
+/* =====================================================================
+   UTILIDADES — rol
+   ===================================================================== */
+const rolUsuario = () => USUARIO ? (USUARIO.rol || ROL.OP) : ROL.OP;
+const esAdmin    = () => rolUsuario() === ROL.ADMIN || (USUARIO && USUARIO.id === ADMIN_ID);
+const esSup      = () => esAdmin() || rolUsuario() === ROL.SUP;
+const puedeElim  = () => esSup();
+
+/* =====================================================================
+   USUARIOS
+   ===================================================================== */
 function sesion(){ try{ return JSON.parse(localStorage.getItem(SESION)); }catch(e){ return null; } }
-function pintarUsuario(){ $('#usuario-chip').textContent = SOLO_VER ? '👁 Solo lectura' : ('👤 ' + (USUARIO ? USUARIO.nombre : '—')); }
+function pintarUsuario(){
+  const lbl = SOLO_VER ? '👁 SOLO LECTURA' : ('👤 ' + (USUARIO ? USUARIO.nombre.toUpperCase() : '—'));
+  $('#usuario-chip').textContent = lbl;
+}
 function pedirUsuario(){
   if(SOLO_VER) return;
   const caja = $('#login-caja');
   caja.innerHTML = `<h2>¿Quién trabaja?</h2>
     <p>Todo lo que registres quedará firmado con tu nombre en la trazabilidad.</p>
-    ${D.usuarios.map(u=>`<button class="ubtn" onclick="entrar('${esc(u.id)}')">
-      <span class="ini">${esc(u.nombre.charAt(0).toUpperCase())}</span>${esc(u.nombre)}</button>`).join('')}
+    ${D.usuarios.map(u=>{
+      const r = u.id===ADMIN_ID?'admin':(u.rol||'operador');
+      const rc = r==='admin'?'rol-admin':r==='supervisor'?'rol-sup':'rol-op';
+      const rl = r==='admin'?'ADMIN':r==='supervisor'?'SUPERVISOR':'OPERADOR';
+      return `<button class="ubtn" onclick="entrar('${esc(u.id)}')">
+        <span class="ini">${esc(u.nombre.charAt(0).toUpperCase())}</span>${esc(u.nombre)}
+        <span class="rol-chip ${rc}">${rl}</span></button>`;
+    }).join('')}
     <button class="ubtn" style="border:2px dashed #4A4F55;background:transparent" onclick="location.search='ver'">👁 Entrar solo para ver</button>`;
   $('#login').classList.add('abierto');
 }
 function formUsuario(){
-  if(!(USUARIO && USUARIO.id===ADMIN_ID) && D.usuarios.length>0){
-    alert('Solo el administrador puede crear usuarios.'); return;
-  }
+  if(!esAdmin() && D.usuarios.length>0){ alert('Solo el administrador puede crear usuarios.'); return; }
   $('#login-caja').innerHTML = `<h2>Usuario nuevo</h2>
-    <label>Nombre</label><input id="u-nombre" placeholder="Ej: Juan Pérez">
+    <label>Nombre</label><input id="u-nombre" placeholder="Ej: Juan Pérez" style="text-transform:uppercase">
     <label>PIN de 4 números</label><input id="u-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="Ej: 2580">
+    <label>Rol</label>
+    <select id="u-rol">
+      <option value="operador">OPERADOR — captura y edición</option>
+      <option value="supervisor">SUPERVISOR — puede eliminar registros</option>
+      <option value="admin">ADMIN — control total</option>
+    </select>
     <button class="guardar" onclick="crearUsuario()">Crear usuario</button>
-    <button class="ubtn" style="margin-top:10px" onclick="USUARIO?$('#login').classList.remove('abierto'):pedirUsuario()">← Volver</button>`;
+    <button class="ubtn" style="margin-top:10px" onclick="esAdmin()?cambiarUsuario():pedirUsuario()">← Volver</button>`;
 }
 async function crearUsuario(){
-  const esAdmin = USUARIO && USUARIO.id===ADMIN_ID;
-  if(!esAdmin && D.usuarios.length>0){ alert('Solo el administrador puede crear usuarios.'); return; }
-  const nombre = $('#u-nombre').value.trim(), pin = $('#u-pin').value.trim();
+  if(!esAdmin() && D.usuarios.length>0){ alert('Solo el administrador puede crear usuarios.'); return; }
+  const nombre = mayus($('#u-nombre').value.trim()), pin = $('#u-pin').value.trim();
+  const rol = $('#u-rol').value;
   if(!nombre || pin.length!==4){ alert('Escribe el nombre y un PIN de 4 números.'); return; }
-  const u = { id:'USR-'+nombre.toLowerCase().replace(/[^a-z0-9]/g,'-'), nombre, pin };
+  const u = { id:'USR-'+nombre.toLowerCase().replace(/[^a-z0-9]/g,'-'), nombre, pin, rol };
   if(D.usuarios.some(x=>x.id===u.id)){ alert('Ya existe un usuario con ese nombre.'); return; }
   D.usuarios.push(u); await persistir('usuario', u);
-  if(esAdmin){
+  if(esAdmin()){
     $('#login').classList.remove('abierto');
-    alert('Usuario "'+nombre+'" creado ✓. Ya puede entrar con su nombre y PIN.');
+    alert('Usuario "'+nombre+'" creado ✓. Rol: '+rol.toUpperCase());
     return;
   }
   USUARIO = u; localStorage.setItem(SESION, JSON.stringify(u));
@@ -253,23 +378,58 @@ function entrar(id){
 }
 function cambiarUsuario(){
   if(SOLO_VER){ if(confirm('¿Salir del modo solo lectura para trabajar con usuario?')) location.search=''; return; }
-  if(USUARIO && USUARIO.id===ADMIN_ID){
+  if(esAdmin()){
     $('#login-caja').innerHTML = `<h2>Administración</h2>
-      <p>Hola ${esc(USUARIO.nombre)} — eres el administrador.</p>
+      <p>Hola ${esc(USUARIO.nombre)} — eres administrador.</p>
       <button class="ubtn" onclick="formUsuario()">＋ Crear usuario nuevo</button>
+      <button class="ubtn" onclick="formGestionUsuarios()">👥 Gestionar usuarios</button>
       <button class="ubtn" onclick="salirUsuario()">Cambiar de usuario</button>
       <button class="ubtn" style="margin-top:10px;border:2px dashed #4A4F55;background:transparent" onclick="$('#login').classList.remove('abierto')">← Volver a la app</button>`;
-    $('#login').classList.add('abierto');
-    return;
+    $('#login').classList.add('abierto'); return;
   }
   salirUsuario();
 }
+function formGestionUsuarios(){
+  const filas = D.usuarios.filter(u=>u.id!==ADMIN_ID).map(u=>{
+    const r = u.rol||'operador';
+    return `<div style="background:#31363D;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <div><b style="color:#fff">${esc(u.nombre)}</b><br><span style="font-size:12px;color:#9AA0A8">${r.toUpperCase()}</span></div>
+      <button onclick="cambiarRolUsuario('${esc(u.id)}')" style="background:#4A4F55;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">Cambiar rol</button>
+    </div>`;
+  }).join('');
+  $('#login-caja').innerHTML = `<h2>Gestionar usuarios</h2>
+    ${filas || '<p>No hay usuarios adicionales.</p>'}
+    <button class="ubtn" style="margin-top:10px" onclick="cambiarUsuario()">← Volver</button>`;
+}
+function cambiarRolUsuario(id){
+  const u = D.usuarios.find(x=>x.id===id); if(!u) return;
+  const nuevoRol = prompt(`Rol actual de ${u.nombre}: ${u.rol||'operador'}\n\nEscribe el nuevo rol:\n  operador\n  supervisor\n  admin`);
+  if(!nuevoRol || !['operador','supervisor','admin'].includes(nuevoRol.toLowerCase())) return;
+  u.rol = nuevoRol.toLowerCase(); persistir('usuario', u);
+  alert(`Rol de ${u.nombre} actualizado a: ${u.rol.toUpperCase()}`);
+  formGestionUsuarios();
+}
 function salirUsuario(){ USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
 
-/* ================= ALMACENAMIENTO ================= */
+/* =====================================================================
+   CONFIRMACIÓN DE BORRADO (reemplaza confirm() nativo para borrados)
+   ===================================================================== */
+function pedirConfirm(titulo, msg, cb){
+  $('#confirm-titulo').textContent = titulo;
+  $('#confirm-msg').textContent = msg;
+  confirmCallback = cb;
+  $('#confirm-overlay').classList.add('abierto');
+}
+function cerrarConfirm(){ $('#confirm-overlay').classList.remove('abierto'); confirmCallback = null; }
+$('#confirm-ok').onclick = ()=>{ cerrarConfirm(); if(confirmCallback) confirmCallback(); };
+
+/* =====================================================================
+   ALMACENAMIENTO
+   ===================================================================== */
 function cacheLocal(){ try{ localStorage.setItem(CACHE, JSON.stringify(D)); }catch(e){
-  alert('El almacenamiento de este teléfono está lleno (modo local guarda fotos aquí). Configura Supabase para espacio ilimitado de registros.'); } }
+  alert('Almacenamiento lleno. Configura Supabase para espacio ilimitado.'); } }
 function leerCacheLocal(){ try{ const v = localStorage.getItem(CACHE); if(v) D = Object.assign(D, JSON.parse(v)); }catch(e){} }
+function guardarModelosLocal(){ localStorage.setItem('bodega:modelos', JSON.stringify(MODELOS_LISTA)); }
 
 async function cargar(mostrar=true){
   $('#modo').textContent = sb ? '· BASE COMPARTIDA' : '· SOLO ESTE DISPOSITIVO';
@@ -283,14 +443,14 @@ async function cargar(mostrar=true){
     if(error) throw error;
     D = { nucleos:[], partes:[], movs:[], usuarios:[] };
     for(const fila of data){
-      if(fila.col==='nucleo') D.nucleos.push(fila.data);
-      else if(fila.col==='parte') D.partes.push(fila.data);
-      else if(fila.col==='mov') D.movs.push(fila.data);
-      else if(fila.col==='usuario') D.usuarios.push(fila.data);
+      if(fila.col==='nucleo')   D.nucleos.push(fila.data);
+      else if(fila.col==='parte')    D.partes.push(fila.data);
+      else if(fila.col==='mov')      D.movs.push(fila.data);
+      else if(fila.col==='usuario')  D.usuarios.push(fila.data);
     }
-    D.nucleos.sort((a,b)=> (b.id>a.id?1:-1));
-    D.partes.sort((a,b)=> (b.id>a.id?1:-1));
-    D.movs.sort((a,b)=> (b.ts||'').localeCompare(a.ts||''));
+    D.nucleos.sort((a,b)=>(b.id>a.id?1:-1));
+    D.partes.sort((a,b)=>(b.id>a.id?1:-1));
+    D.movs.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
     cacheLocal(); dot('#3FBF6A'); render(); pintarUbic();
   }catch(e){ dot('#D24B3F'); console.error('Supabase:', e); }
   if(!USUARIO) pedirUsuario();
@@ -304,51 +464,78 @@ async function persistir(col, obj){
     const { error } = await sb.from('bodega').upsert({ id: obj.id, col, data: obj, updated_at: new Date().toISOString() });
     if(error) throw error;
     dot('#3FBF6A');
-  }catch(e){ dot('#D24B3F'); alert('No se pudo guardar en la base compartida. Revisa tu internet y toca ⟳ para reintentar.\n\nEl dato quedó guardado en este teléfono.'); }
+  }catch(e){ dot('#D24B3F'); alert('No se pudo guardar en la base compartida. Revisa internet y toca ⟳.\n\nEl dato quedó guardado en este dispositivo.'); }
 }
+
 async function eliminar(id){
   cacheLocal();
   if(!sb){ dot('#3FBF6A'); return; }
   try{ await sb.from('bodega').delete().eq('id', id); dot('#3FBF6A'); }catch(e){ dot('#D24B3F'); }
 }
 
-/* ================= FOTOS =================
-   La foto se comprime en el teléfono (máx 1280px, JPEG) antes de subir:
-   pesa ~100-250 KB. Con el 1 GB gratis de Supabase Storage caben
-   miles de fotos. Sin Supabase, se guarda en el dispositivo.      */
+/* =====================================================================
+   GENERACIÓN DE IDs — resistente a concurrencia
+   Se añade microsegundos + random para evitar colisiones entre usuarios
+   ===================================================================== */
+function generarId(pref, lista){
+  /* Calcula el máximo existente localmente */
+  let max = 0;
+  for(const o of lista){
+    const m = String(o.id||'').match(new RegExp('^'+pref+'.*?(\\d+)$'));
+    if(m) max = Math.max(max, parseInt(m[1],10));
+  }
+  const siguiente = max + 1;
+  /* Agrega microsello de tiempo para minimizar colisión en upsert concurrente */
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.floor(Math.random()*100).toString().padStart(2,'0');
+  /* Para núcleos mantenemos formato legible; para partes añadimos sello corto */
+  return `${pref}-${String(siguiente).padStart(4,'0')}-${ts}${rnd}`;
+}
+function generarIdNucleo(tipo){
+  const pref = tipo==='Transmisión'?'TR':'DF';
+  const mes = hoy().slice(0,7);
+  let max = 0;
+  D.nucleos.forEach(n=>{
+    const m = String(n.id||'').match(/(\d{4})(?:-[A-Z0-9]+)?$/);
+    if(m && String(n.id).startsWith(pref+'-'+mes)) max = Math.max(max, parseInt(m[1],10));
+  });
+  const ts = Date.now().toString(36).slice(-3).toUpperCase();
+  return `${pref}-${mes}-${String(max+1).padStart(4,'0')}-${ts}`;
+}
+
+/* =====================================================================
+   FOTOS
+   ===================================================================== */
 function comprimirFoto(file){
   return new Promise((res, rej)=>{
     const img = new Image();
     img.onload = ()=>{
-      const MAX = 1280;
-      let w = img.width, h = img.height;
-      if(w>h && w>MAX){ h = h*MAX/w; w = MAX; } else if(h>=w && h>MAX){ w = w*MAX/h; h = MAX; }
-      const c = document.createElement('canvas'); c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      c.toBlob(b => b ? res({blob:b, dataUrl:c.toDataURL('image/jpeg', .72)}) : rej('sin blob'), 'image/jpeg', .72);
+      const MAX = 1280; let w = img.width, h = img.height;
+      if(w>h && w>MAX){ h=h*MAX/w; w=MAX; } else if(h>=w && h>MAX){ w=w*MAX/h; h=MAX; }
+      const c = document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      c.toBlob(b=>b?res({blob:b,dataUrl:c.toDataURL('image/jpeg',.72)}):rej('sin blob'),'image/jpeg',.72);
     };
-    img.onerror = rej;
-    img.src = URL.createObjectURL(file);
+    img.onerror = rej; img.src = URL.createObjectURL(file);
   });
 }
 async function subirFoto(id){
   if(!fotoPend) return '';
-  if(!sb) return fotoPend.dataUrl;   // modo local: la foto vive en el teléfono
+  if(!sb) return fotoPend.dataUrl;
   const ruta = `${id}_${Date.now()}.jpg`;
-  const { error } = await sb.storage.from('fotos').upload(ruta, fotoPend.blob, { contentType:'image/jpeg' });
-  if(error){ alert('La foto no se pudo subir (¿existe el bucket "fotos"?). El registro se guardará sin foto; puedes reintentar editándolo luego.'); return ''; }
+  const { error } = await sb.storage.from('fotos').upload(ruta, fotoPend.blob, {contentType:'image/jpeg'});
+  if(error){ alert('La foto no se pudo subir. El registro se guardará sin foto; edítalo luego para agregarla.'); return ''; }
   return sb.storage.from('fotos').getPublicUrl(ruta).data.publicUrl;
 }
 async function seleccionFoto(input){
   if(!input.files || !input.files[0]) return;
   try{
     fotoPend = await comprimirFoto(input.files[0]);
-    const p = $('#foto-prev'); p.src = fotoPend.dataUrl; p.style.display = 'block';
+    const p = $('#foto-prev'); p.src=fotoPend.dataUrl; p.style.display='block';
     $('#fotobtn-txt').textContent = '✓ Foto lista — tocar para cambiar';
   }catch(e){ alert('No se pudo leer la imagen. Intenta con otra foto.'); }
 }
-function verFoto(url){ $('#visor-img').src = url; $('#visor').classList.add('abierto'); }
-
+function verFoto(url){ $('#visor-img').src=url; $('#visor').classList.add('abierto'); }
 const bloqueFoto = () => `
   <div class="fotozona">
     <label class="fotobtn" style="margin:0">
@@ -358,312 +545,819 @@ const bloqueFoto = () => `
     <img id="foto-prev" class="foto-prev" alt="vista previa">
   </div>`;
 
-/* IDs seguros con varios usuarios */
-function siguienteId(pref, lista){
-  let max = 0;
-  for(const o of lista){
-    const m = String(o.id||'').match(new RegExp('^'+pref+'.*?(\\d+)$'));
-    if(m) max = Math.max(max, parseInt(m[1],10));
-  }
-  return max+1;
-}
+/* =====================================================================
+   UBICACIONES
+   ===================================================================== */
 function ubicaciones(){
   const s = new Set(UBIC_BASE);
-  D.nucleos.forEach(n=>n.ubic&&s.add(n.ubic));
-  D.partes.forEach(p=>p.ubic&&s.add(p.ubic));
+  D.nucleos.forEach(n=>n.ubic&&s.add(n.ubic.toUpperCase()));
+  D.partes.forEach(p=>p.ubic&&s.add(p.ubic.toUpperCase()));
   return [...s];
 }
 function pintarUbic(){ $('#dl-ubic').innerHTML = ubicaciones().map(u=>`<option>${esc(u)}</option>`).join(''); }
-function mov(id, origen, destino, motivo){
-  const m = { id:'MOV-'+Date.now()+'-'+Math.floor(Math.random()*1000), ts:new Date().toISOString(),
-    fecha:hoy(), ref:id, origen:origen||'—', destino, motivo, resp: USUARIO ? USUARIO.nombre : '' };
+
+/* =====================================================================
+   MOVIMIENTOS — con fecha editable
+   ===================================================================== */
+function mov(id, origen, destino, motivo, fechaOverride){
+  const fechaUsada = fechaOverride || hoy();
+  const m = {
+    id:'MOV-'+Date.now()+'-'+Math.floor(Math.random()*9999),
+    ts: new Date().toISOString(),
+    fecha: fechaUsada,
+    ref:id, origen:origen||'—', destino, motivo,
+    resp: USUARIO ? USUARIO.nombre : ''
+  };
   D.movs.unshift(m); persistir('mov', m);
 }
 
-/* ================= VISTAS ================= */
-const coincide = o => !filtro || JSON.stringify(o).toLowerCase().includes(filtro);
+/* =====================================================================
+   FILTROS — lógica de filtrado
+   ===================================================================== */
+function marcaCoincide(marcaRegistro, filtroCabeza){
+  if(!filtroCabeza) return true;
+  const sub = MARCAS_MAPA[filtroCabeza] || [];
+  const mr = mayus(marcaRegistro||'');
+  return sub.some(s => mr.includes(s));
+}
+
+function coincideNucleo(n){
+  if(F.tipo && n.tipo !== F.tipo) return false;
+  if(F.posicion){
+    const cars = (n.cars||[]).map(c=>mayus(c.v||''));
+    const notas = mayus(n.notas||'');
+    const posStr = F.posicion.toUpperCase();
+    if(!cars.some(v=>v.includes(posStr)) && !notas.includes(posStr)) return false;
+  }
+  if(F.marca && !marcaCoincide(n.marca, F.marca)) return false;
+  if(filtro && !JSON.stringify(n).toUpperCase().includes(filtro)) return false;
+  return true;
+}
+function coincideParte(p){
+  if(F.parteTipo && !mayus(p.tipo||'').includes(F.parteTipo.toUpperCase())) return false;
+  const cars = p.cars||[];
+  if(F.car1 && !mayus(cars[0]?.v||'').includes(F.car1.toUpperCase())) return false;
+  if(F.car2 && !mayus(cars[1]?.v||'').includes(F.car2.toUpperCase())) return false;
+  if(F.car3 && !mayus(cars[2]?.v||'').includes(F.car3.toUpperCase())) return false;
+  if(filtro && !JSON.stringify(p).toUpperCase().includes(filtro)) return false;
+  return true;
+}
+
+/* =====================================================================
+   FILTROS — render de la barra
+   ===================================================================== */
+function renderFiltros(){
+  const wrap = $('#filtros-wrap');
+  if(tab==='nucleos'){
+    wrap.innerHTML = `
+      <div class="fila-filtro">
+        <span class="filtro-label">Tipo:</span>
+        ${['Transmisión','Diferencial'].map(t=>`
+          <button class="filtro-btn${F.tipo===t?' on':''}" onclick="setF('tipo','${t}')">${t}</button>`).join('')}
+      </div>
+      <div class="fila-filtro">
+        <span class="filtro-label">Pos:</span>
+        ${['Delantero','Trasero'].map(p=>`
+          <button class="filtro-btn${F.posicion===p?' on':''}" onclick="setF('posicion','${p}')">${p}</button>`).join('')}
+        <span class="filtro-label" style="margin-left:6px">Marca:</span>
+        ${MARCAS_CABEZA.map(m=>`
+          <button class="filtro-btn${F.marca===m?' marca-on':''}" onclick="setF('marca','${m}')">${m}</button>`).join('')}
+      </div>`;
+  } else if(tab==='partes'){
+    const tiposExistentes = [...new Set(D.partes.map(p=>mayus(p.tipo||'')).filter(Boolean))].slice(0,8);
+    /* Obtener nombres de car1/car2/car3 del primer registro como referencia */
+    const ejCars = D.partes[0]?.cars||[];
+    const lbl1 = ejCars[0]?.n||'CAR 1';
+    const lbl2 = ejCars[1]?.n||'CAR 2';
+    const lbl3 = ejCars[2]?.n||'CAR 3';
+    wrap.innerHTML = `
+      <div class="fila-filtro" style="gap:4px">
+        <span class="filtro-label">Tipo:</span>
+        ${tiposExistentes.map(t=>`
+          <button class="filtro-btn${F.parteTipo===t?' on':''}" onclick="setF('parteTipo','${esc(t)}')" style="font-size:11px">${t}</button>`).join('')}
+      </div>
+      <div class="fila-filtro" style="gap:4px">
+        <input placeholder="${esc(lbl1)}…" value="${esc(F.car1)}" oninput="setF('car1',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
+        <input placeholder="${esc(lbl2)}…" value="${esc(F.car2)}" oninput="setF('car2',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
+        <input placeholder="${esc(lbl3)}…" value="${esc(F.car3)}" oninput="setF('car3',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
+      </div>`;
+  } else {
+    wrap.innerHTML = '';
+  }
+}
+function setF(key, val){
+  /* Toggle: si ya está seleccionado, deselecciona */
+  F[key] = (F[key]===val) ? '' : val;
+  renderFiltros(); render();
+}
+function limpiarFiltros(){
+  F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:''};
+  renderFiltros(); render();
+}
+
+/* =====================================================================
+   VISTAS — render principal
+   ===================================================================== */
 function chips(cars){
-  const c = (cars||[]).filter(x=>x && x.v);
+  const c = (cars||[]).filter(x=>x&&x.v);
   return c.length ? `<div class="chips">${c.map(x=>`<span class="chip">${esc(x.n)}: <b>${esc(x.v)}</b></span>`).join('')}</div>` : '';
 }
 const miniFoto = o => o.foto ? `<img class="foto-mini" src="${esc(o.foto)}" onclick="verFoto('${esc(o.foto)}')" alt="foto">` : '';
 
 function render(){
+  renderFiltros();
   const v = $('#vista');
-  $('#fab').style.display = (!SOLO_VER && (tab==='nucleos'||tab==='partes')) ? 'block':'none';
-  const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo (fotos incluidas). Para compartir entre teléfonos, pega la URL y la llave de Supabase en index.html (ver instrucciones).</div>` : '';
+  const puedeAgregar = !SOLO_VER && (tab==='nucleos'||tab==='partes');
+  $('#fab').style.display = puedeAgregar ? 'block':'none';
+  const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo. Para compartir, configura Supabase en index.html.</div>` : '';
 
   if(tab==='nucleos'){
-    const lista = D.nucleos.filter(coincide);
-    v.innerHTML = avisoConfig + (lista.length ? lista.map(n=>`
-      <div class="card">
-        <div class="top"><span class="id">${esc(n.id)}</span><span class="tag">${esc(n.ubic)}</span></div>
+    const lista = D.nucleos.filter(coincideNucleo);
+    v.innerHTML = avisoConfig + (lista.length ? lista.map(n=>{
+      const esRemfg = n.zona==='Re-manufactura';
+      const btnElim = puedeElim()
+        ? `<button class="peligro-sup" onclick="borrar('nucleos','${n.id}')">✕</button>`
+        : '';
+      const btnAccion = esRemfg
+        ? `<button class="morado" onclick="verNucleoRemfg('${n.id}')">🔧 Ver Re-Mfg</button>`
+        : (n.zona==='Desmontado'
+            ? `<button class="warn" onclick="formParte('${n.id}')">+ Parte de este núcleo</button>`
+            : `<button class="warn" onclick="desarmar('${n.id}')">Desarmar → partes</button>`);
+      const btnRemfg = (!esRemfg && !SOLO_VER)
+        ? `<button class="morado" onclick="enviarARemfg('${n.id}')">🔧 Re-manufactura</button>` : '';
+      return `<div class="card${esRemfg?' remfg':''}">
+        <div class="top"><span class="id">${esc(n.id)}</span><span class="tag${esRemfg?' remfg-tag':''}">${esc(n.ubic)}</span></div>
         <div class="cuerpo">${miniFoto(n)}<div class="info">
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
-          <div class="meta">${esc(n.tipo)} · Serie ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
+          <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
           <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
         </div></div>
         ${chips(n.cars)}
-        <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':'dispo'}">● ${esc(n.zona)}</div>
+        <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':esRemfg?'remfg-est':'dispo'}">● ${esc(n.zona||'Recibido')}</div>
         ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formNucleo('${n.id}')">✎ Editar</button>
           <button onclick="formMover('${n.id}')">Mover</button>
-          ${n.zona!=='Desmontado' ? `<button class="warn" onclick="desarmar('${n.id}')">Desarmar → partes</button>`:
-            `<button class="warn" onclick="formParte('${n.id}')">+ Parte de este núcleo</button>`}
-          <button class="peligro" onclick="borrar('nucleos','${n.id}')">✕</button>
+          ${btnAccion}
+          ${btnRemfg}
+          ${btnElim}
         </div>`}
-      </div>`).join('') :
-      `<div class="vacio"><b>Sin núcleos${filtro?' que coincidan':''}</b>Toca el botón naranja <b>+</b> para registrar la primera transmisión o diferencial.</div>`);
+      </div>`;
+    }).join('') :
+    `<div class="vacio"><b>Sin núcleos${(filtro||F.tipo||F.posicion||F.marca)?' que coincidan':''}</b>
+      ${(F.tipo||F.posicion||F.marca)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--azul);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Toca + para registrar la primera transmisión o diferencial.'}
+    </div>`);
   }
 
-  if(tab==='partes'){
-    const lista = D.partes.filter(coincide);
+  else if(tab==='partes'){
+    const lista = D.partes.filter(coincideParte);
     v.innerHTML = avisoConfig + (lista.length ? lista.map(p=>`
       <div class="card parte">
         <div class="top"><span class="id">${esc(p.id)}</span><span class="tag">${esc(p.ubic)}</span></div>
         <div class="cuerpo">${miniFoto(p)}<div class="info">
           <h3>${esc(p.tipo)}</h3>
-          <div class="meta">Origen: <b>${esc(p.origen||'—')}</b> · ${esc(p.cond||'')}</div>
+          <div class="meta">ORIGEN: <b>${esc(p.origen||'—')}</b> · ${esc(p.cond||'')}</div>
           <div class="meta">${esc(p.fecha)} ${p.resp?'· 👤 '+esc(p.resp):''}</div>
-          ${p.precio?`<div class="meta">Precio: <b>L ${Number(p.precio).toLocaleString()}</b></div>`:''}
+          ${p.precio?`<div class="meta">PRECIO: <b>L ${Number(p.precio).toLocaleString()}</b></div>`:''}
+          ${p.modelos&&p.modelos.length?`<div class="meta" style="font-size:11px">MODELOS: ${esc(p.modelos.join(', '))}</div>`:''}
         </div></div>
         ${chips(p.cars)}
         <div class="estado ${p.venta==='Vendido'?'scrap':'dispo'}">● ${esc(p.venta||'Disponible')}</div>
         ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
-          <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Marcar disponible':'Marcar vendido'}</button>
-          <button class="peligro" onclick="borrar('partes','${p.id}')">✕</button>
+          <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Disponible':'Vendido'}</button>
+          ${puedeElim()?`<button class="peligro-sup" onclick="borrar('partes','${p.id}')">✕</button>`:''}
         </div>`}
       </div>`).join('') :
-      `<div class="vacio"><b>Sin partes${filtro?' que coincidan':''}</b>Desarma un núcleo o toca <b>+</b> para registrar una parte suelta.</div>`);
+    `<div class="vacio"><b>Sin partes${(filtro||F.parteTipo||F.car1||F.car2||F.car3)?' que coincidan':''}</b>
+      ${(F.parteTipo||F.car1||F.car2||F.car3)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--naranja);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Desarma un núcleo o toca + para registrar una parte suelta.'}
+    </div>`);
   }
 
-  if(tab==='movs'){
-    const lista = D.movs.filter(coincide);
-    v.innerHTML = `<div class="seccion-t">Historial de movimientos</div>` + (lista.length ? lista.map(m=>`
+  else if(tab==='remfg'){
+    const lista = D.nucleos.filter(n=>n.zona==='Re-manufactura');
+    v.innerHTML = `<div class="seccion-t">🔧 Núcleos en Re-manufactura</div>
+      <div class="aviso-morado">Estos núcleos están en proceso de re-manufactura. Pueden venderse como unidad completa o ser devueltos al flujo normal.</div>` +
+    (lista.length ? lista.map(n=>`
+      <div class="card remfg">
+        <div class="top"><span class="id">${esc(n.id)}</span><span class="tag remfg-tag">${esc(n.ubic)}</span></div>
+        <div class="cuerpo">${miniFoto(n)}<div class="info">
+          <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
+          <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')}</div>
+          <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
+          ${n.precioRemfg?`<div class="meta"><b>PRECIO RE-MFG: L ${Number(n.precioRemfg).toLocaleString()}</b></div>`:''}
+        </div></div>
+        ${chips(n.cars)}
+        <div class="estado remfg-est">● ${esc(n.zonaRemfg||'TALLER ZAPOTAL')}</div>
+        ${SOLO_VER ? '' : `<div class="acciones">
+          <button onclick="formNucleo('${n.id}')">✎ Editar</button>
+          <button onclick="formMover('${n.id}')">Mover ubicación</button>
+          <button class="warn" onclick="venderNucleoRemfg('${n.id}')">💰 Registrar venta</button>
+          <button class="morado" onclick="devolverFlujo('${n.id}')">↩ Devolver al flujo</button>
+          ${puedeElim()?`<button class="peligro-sup" onclick="borrar('nucleos','${n.id}')">✕</button>`:''}
+        </div>`}
+      </div>`).join('') :
+    `<div class="vacio"><b>Sin núcleos en re-manufactura</b>Desde un núcleo, usa el botón "Re-manufactura" para moverlo a este estado.</div>`);
+  }
+
+  else if(tab==='movs'){
+    const lista = D.movs.filter(m=>!filtro||JSON.stringify(m).toUpperCase().includes(filtro));
+    v.innerHTML = `<div class="seccion-t">Historial de movimientos</div>` +
+    (lista.length ? lista.map(m=>`
       <div class="mov"><div class="f">${esc(m.fecha)} · ${esc(m.resp||'')}</div>
       <b class="id">${esc(m.ref)}</b> — ${esc(m.origen)} → <b>${esc(m.destino)}</b><br>${esc(m.motivo)}</div>`).join('') :
-      `<div class="vacio"><b>Sin movimientos</b>Cada registro, traslado o desarme queda anotado aquí automáticamente.</div>`);
+    `<div class="vacio"><b>Sin movimientos</b>Cada registro, traslado o desarme queda anotado aquí automáticamente.</div>`);
   }
 
-  if(tab==='resumen'){
-    const nd = D.nucleos.length, tr = D.nucleos.filter(n=>n.tipo==='Transmisión').length;
+  else if(tab==='resumen'){
+    const nd = D.nucleos.length;
+    const tr = D.nucleos.filter(n=>n.tipo==='Transmisión').length;
+    const df = nd - tr;
+    const remfgCnt = D.nucleos.filter(n=>n.zona==='Re-manufactura').length;
     const dispo = D.partes.filter(p=>p.venta!=='Vendido').length;
     const valor = D.partes.filter(p=>p.venta!=='Vendido').reduce((s,p)=>s+(Number(p.precio)||0),0);
     v.innerHTML = `
       <div class="kpis">
-        <div class="kpi"><div class="num">${nd}</div><div class="lbl">Núcleos</div></div>
-        <div class="kpi"><div class="num">${tr} / ${nd-tr}</div><div class="lbl">Transm. / Difer.</div></div>
+        <div class="kpi"><div class="num">${nd}</div><div class="lbl">Núcleos totales</div></div>
+        <div class="kpi"><div class="num">${tr} / ${df}</div><div class="lbl">Transm. / Difer.</div></div>
         <div class="kpi n2"><div class="num">${dispo}</div><div class="lbl">Partes disponibles</div></div>
         <div class="kpi n2"><div class="num">L ${valor.toLocaleString()}</div><div class="lbl">Valor en partes</div></div>
+        <div class="kpi n3"><div class="num">${remfgCnt}</div><div class="lbl">En re-manufactura</div></div>
       </div>
+      <div class="seccion-t">Por marca</div>
+      <div class="chips">${MARCAS_CABEZA.map(m=>{
+        const c = D.nucleos.filter(n=>marcaCoincide(n.marca,m)).length;
+        return `<span class="tag" style="margin:2px">${esc(m)} · ${c}</span>`;
+      }).join('')}</div>
       <div class="seccion-t">Ubicaciones en uso</div>
       <div class="chips">${ubicaciones().map(u=>{
         const c = D.nucleos.filter(n=>n.ubic===u).length + D.partes.filter(p=>p.ubic===u).length;
-        return `<span class="tag" style="margin:2px">${esc(u)} · ${c}</span>`;}).join('')}</div>
+        return c>0?`<span class="tag" style="margin:2px">${esc(u)} · ${c}</span>`:'';}).join('')}</div>
       <div class="seccion-t">Equipo</div>
-      <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)}</span>`).join('') || '<span class="meta">Sin usuarios aún</span>'}</div>
+      <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)} <b style="color:${u.rol==='admin'?'#C9900A':u.rol==='supervisor'?'#2B5A87':'#666'}">(${(u.rol||'OP').toUpperCase()})</b></span>`).join('')||'<span class="meta">Sin usuarios aún</span>'}</div>
       <button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (CSV)</button>
       <div class="meta" style="margin-top:8px">El archivo exportado se abre directamente en Excel y sirve de respaldo semanal.</div>`;
   }
 }
 
-/* ================= FORMULARIOS ================= */
-function abrirHoja(html){ fotoPend = null; $('#panel').innerHTML = html; $('#hoja').classList.add('abierta'); window.scrollTo(0,0); }
+/* =====================================================================
+   FORMULARIOS — helpers
+   ===================================================================== */
+function abrirHoja(html){ fotoPend=null; $('#panel').innerHTML=html; $('#hoja').classList.add('abierta'); window.scrollTo(0,0); }
 function cerrarHoja(){ $('#hoja').classList.remove('abierta'); }
 
+/* Bloque de características genérico */
 function camposCars(nombres){
-  return `<div class="carbloque"><div class="titulo">5 características</div>
+  return `<div class="carbloque"><div class="titulo">Características</div>
     ${[0,1,2,3,4].map(i=>`<div class="carfila">
-      <input id="cn${i}" placeholder="Nombre" value="${esc(nombres[i]||'')}">
-      <input id="cv${i}" placeholder="Valor / medida">
+      <input id="cn${i}" placeholder="NOMBRE" value="${esc(nombres[i]||'')}">
+      <input id="cv${i}" placeholder="VALOR / MEDIDA">
     </div>`).join('')}</div>`;
 }
-const leerCars = () => [0,1,2,3,4].map(i=>({n:$('#cn'+i).value.trim(), v:$('#cv'+i).value.trim()}));
-function ponSug(t){ const s = SUG[t]||SUG._def; [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value = s[i]||''; }); }
+const leerCars = () => [0,1,2,3,4].map(i=>({n:mayus($('#cn'+i).value.trim()), v:mayus($('#cv'+i).value.trim())}));
+function ponSug(t){
+  const s = SUG[t]||SUG._def;
+  [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value = s[i]||''; });
+  /* Mostrar/ocultar bloque especial según tipo */
+  const beC = $('#bloque-coplin'); const beCor = $('#bloque-corona'); const beMack = $('#bloque-mack');
+  if(beC) beC.style.display = (t==='Coplín') ? 'block':'none';
+  if(beCor) beCor.style.display = (t==='Corona-Piñón') ? 'block':'none';
+}
 
+/* Bloque especial para COPLÍN */
+const bloqueCoplin = () => `
+  <div class="bloque-especial" id="bloque-coplin" style="display:none">
+    <div class="titulo">Campos de coplín</div>
+    <label>TH — N° de dientes (pista / coplín)</label>
+    <input id="coplin-th" type="number" inputmode="numeric" placeholder="Ej: 32">
+    <div class="fila2">
+      <div><label>Cruz — largo</label><input id="coplin-cruz" placeholder="Ej: 3.5"></div>
+      <div><label>Pista — diámetro</label><input id="coplin-pista" placeholder="Ej: 4.25"></div>
+    </div>
+    ${bloqueModelos()}
+  </div>`;
+
+/* Bloque especial para CORONA-PIÑÓN */
+const bloqueCorona = () => `
+  <div class="bloque-especial" id="bloque-corona" style="display:none">
+    <div class="titulo">Corona y piñón</div>
+    <div class="fila2">
+      <div><label>Ratio</label><input id="corona-ratio" placeholder="Ej: 3.90"></div>
+      <div><label>N° de parte corona</label><input id="corona-npc"></div>
+    </div>
+    <label>N° de parte piñón</label><input id="corona-npp">
+    ${bloqueModelos()}
+  </div>`;
+
+/* Bloque de modelos compatibles */
+function bloqueModelos(seleccionados){
+  const sel = seleccionados||[];
+  return `<div style="margin-top:10px">
+    <label>Modelos compatibles</label>
+    <div class="modelos-wrap" id="modelos-lista">
+      ${MODELOS_LISTA.map(m=>`<label><input type="checkbox" value="${esc(m)}" ${sel.includes(m)?'checked':''}> ${esc(m)}</label>`).join('')}
+    </div>
+    <div class="modelos-add">
+      <input id="modelo-nuevo" placeholder="AGREGAR MODELO…">
+      <button type="button" onclick="agregarModelo()">+ Agregar</button>
+    </div>
+  </div>`;
+}
+function agregarModelo(){
+  const v = mayus($('#modelo-nuevo').value.trim()); if(!v) return;
+  if(!MODELOS_LISTA.includes(v)){ MODELOS_LISTA.push(v); guardarModelosLocal(); }
+  const wrap = $('#modelos-lista'); if(!wrap) return;
+  const lbl = document.createElement('label');
+  lbl.innerHTML = `<input type="checkbox" value="${esc(v)}" checked> ${esc(v)}`;
+  wrap.appendChild(lbl); $('#modelo-nuevo').value='';
+}
+function leerModelos(){
+  const checks = document.querySelectorAll('#modelos-lista input[type=checkbox]:checked');
+  return [...checks].map(c=>c.value);
+}
+
+/* Leer campos especiales de coplín */
+function leerCoplin(){
+  const beC = $('#bloque-coplin');
+  if(!beC || beC.style.display==='none') return null;
+  return { th: $('#coplin-th').value, cruz: $('#coplin-cruz').value, pista: $('#coplin-pista').value };
+}
+function leerCorona(){
+  const beC = $('#bloque-corona');
+  if(!beC || beC.style.display==='none') return null;
+  return { ratio: $('#corona-ratio').value, npc: $('#corona-npc').value, npp: $('#corona-npp').value };
+}
+
+/* Campos MACK Diferencial */
+const bloqueMack = (esNuevo) => `
+  <div class="bloque-especial" id="bloque-mack">
+    <div class="titulo">Diferencial MACK — campos específicos</div>
+    <label>Ratio</label><input id="mack-ratio" placeholder="Ej: 3.70">
+    <div class="fila2">
+      <div><label>TH flecha (dientes)</label><input id="mack-th-flecha" type="number" inputmode="numeric"></div>
+      <div><label>OTH coplín (dientes)</label><input id="mack-th-coplin" type="number" inputmode="numeric"></div>
+    </div>
+    <div class="fila2">
+      <div><label>N° parte corona</label><input id="mack-npc"></div>
+      <div><label>N° parte piñón</label><input id="mack-npp"></div>
+    </div>
+    <div class="fila2">
+      <div><label>N° atravesado</label><input id="mack-nat"></div>
+      <div><label>N° bull gear</label><input id="mack-nbg"></div>
+    </div>
+  </div>`;
+
+function leerMack(){
+  const b = $('#bloque-mack'); if(!b) return null;
+  return {
+    ratio:$('#mack-ratio')?.value, thFlecha:$('#mack-th-flecha')?.value,
+    thCoplin:$('#mack-th-coplin')?.value, npc:$('#mack-npc')?.value,
+    npp:$('#mack-npp')?.value, nat:$('#mack-nat')?.value, nbg:$('#mack-nbg')?.value
+  };
+}
+function cargarMack(data){
+  if(!data||!$('#bloque-mack')) return;
+  if($('#mack-ratio')) $('#mack-ratio').value=data.ratio||'';
+  if($('#mack-th-flecha')) $('#mack-th-flecha').value=data.thFlecha||'';
+  if($('#mack-th-coplin')) $('#mack-th-coplin').value=data.thCoplin||'';
+  if($('#mack-npc')) $('#mack-npc').value=data.npc||'';
+  if($('#mack-npp')) $('#mack-npp').value=data.npp||'';
+  if($('#mack-nat')) $('#mack-nat').value=data.nat||'';
+  if($('#mack-nbg')) $('#mack-nbg').value=data.nbg||'';
+}
+
+/* detectar si es marca MACK para mostrar bloque especial */
+function onMarcaCambio(){
+  const v = mayus($('#f-marca')?.value||'');
+  const bm = $('#bloque-mack');
+  const tipo = $('#f-tipo')?.value||'';
+  if(bm) bm.style.display = (v.includes('MACK') && tipo==='Diferencial') ? 'block' : 'none';
+}
+
+/* =====================================================================
+   FORMULARIO NÚCLEO
+   ===================================================================== */
 function formNucleo(editId){
   const e = editId ? D.nucleos.find(x=>x.id===editId) : null;
   abrirHoja(`
-    <h2>${e ? 'Editar '+esc(e.id) : 'Nuevo núcleo'} <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <h2>${e ? 'EDITAR '+esc(e.id) : 'NUEVO NÚCLEO'} <button class="x" onclick="cerrarHoja()">✕</button></h2>
     ${bloqueFoto()}
     <label>Tipo</label>
-    <select id="f-tipo" onchange="ponSug(this.value)">
+    <select id="f-tipo" onchange="ponSugNucleo()">
       <option>Transmisión</option><option>Diferencial</option>
     </select>
     <div class="fila2">
-      <div><label>Marca</label><input id="f-marca" placeholder="Eaton Fuller, Rockwell…"></div>
+      <div><label>Marca</label><input id="f-marca" placeholder="EATON, ROCKWELL, MACK…" oninput="onMarcaCambio()"></div>
       <div><label>Modelo</label><input id="f-modelo" placeholder="FRO-15210C"></div>
     </div>
     <div class="fila2">
+      <div><label>Posición</label>
+        <select id="f-posicion"><option value="">— Sin especificar —</option><option>Delantero</option><option>Trasero</option></select>
+      </div>
       <div><label>N° serie</label><input id="f-serie"></div>
-      <div><label>Ubicación / estante</label><input id="f-ubic" list="dl-ubic" placeholder="A20, TRI-01…"></div>
     </div>
-    <label>Estado visual</label><input id="f-estado" placeholder="Corrosión leve, carcasa íntegra…">
+    <label>Ubicación / estante</label><input id="f-ubic" list="dl-ubic" placeholder="A20, TRI-01…">
+    <label>Fecha de ingreso</label>
+    <input type="datetime-local" id="f-fecha" value="${ahoraLocal()}">
+    <label>Estado visual</label><input id="f-estado" placeholder="CORROSIÓN LEVE, CARCASA ÍNTEGRA…">
+    ${bloqueMack()}
     ${camposCars(SUG['Transmisión'])}
     <label>Notas</label><textarea id="f-notas" rows="2"></textarea>
     <button class="guardar" id="btn-g" onclick="guardarNucleo(this,'${editId||''}')">${e ? 'Guardar cambios' : 'Guardar núcleo'}</button>`);
+
+  /* Ocultar bloque MACK por defecto */
+  $('#bloque-mack').style.display='none';
+
   if(e){
-    $('#f-tipo').value = e.tipo || 'Transmisión';
-    $('#f-marca').value = e.marca || ''; $('#f-modelo').value = e.modelo || '';
-    $('#f-serie').value = e.serie || ''; $('#f-ubic').value = e.ubic || '';
-    $('#f-estado').value = e.estado || ''; $('#f-notas').value = e.notas || '';
+    $('#f-tipo').value = e.tipo||'Transmisión';
+    $('#f-marca').value = e.marca||''; $('#f-modelo').value = e.modelo||'';
+    $('#f-posicion').value = e.posicion||''; $('#f-serie').value = e.serie||'';
+    $('#f-ubic').value = e.ubic||''; $('#f-estado').value = e.estado||'';
+    $('#f-notas').value = e.notas||'';
+    if(e.fecha) $('#f-fecha').value = e.fecha.length===10 ? e.fecha+'T00:00' : e.fecha;
     [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value=''; $('#cv'+i).value=''; });
-    (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value = c.n||''; $('#cv'+i).value = c.v||''; });
-    if(e.foto){ const p = $('#foto-prev'); p.src = e.foto; p.style.display = 'block';
-      $('#fotobtn-txt').textContent = '✓ Ya tiene foto — tocar para cambiar'; }
+    (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value=c.n||''; $('#cv'+i).value=c.v||''; });
+    if(e.foto){ const p=$('#foto-prev'); p.src=e.foto; p.style.display='block'; $('#fotobtn-txt').textContent='✓ Ya tiene foto — tocar para cambiar'; }
+    onMarcaCambio();
+    if(e.mack) cargarMack(e.mack);
   }
 }
+function ponSugNucleo(){
+  const t = $('#f-tipo')?.value||'Transmisión';
+  ponSug(t);
+  onMarcaCambio();
+}
 async function guardarNucleo(btn, editId){
-  btn.disabled = true; btn.textContent = 'Guardando…';
+  btn.disabled=true; btn.textContent='Guardando…';
+  const fechaVal = $('#f-fecha').value || ahoraLocal();
+  const fechaGuardar = fechaVal.slice(0,10);
+  const mack = leerMack();
+
   if(editId){
-    const n = D.nucleos.find(x=>x.id===editId);
-    if(!n){ cerrarHoja(); return; }
-    const nuevaFoto = await subirFoto(editId);
-    if(nuevaFoto) n.foto = nuevaFoto;
+    const n = D.nucleos.find(x=>x.id===editId); if(!n){ cerrarHoja(); return; }
+    const nuevaFoto = await subirFoto(editId); if(nuevaFoto) n.foto=nuevaFoto;
     const ubicAnt = n.ubic;
-    n.tipo = $('#f-tipo').value; n.marca = $('#f-marca').value.trim(); n.modelo = $('#f-modelo').value.trim();
-    n.serie = $('#f-serie').value.trim(); n.estado = $('#f-estado').value.trim(); n.cars = leerCars();
-    n.ubic = $('#f-ubic').value.trim() || n.ubic; n.notas = $('#f-notas').value.trim();
+    n.tipo=$('#f-tipo').value; n.marca=mayus($('#f-marca').value.trim()); n.modelo=mayus($('#f-modelo').value.trim());
+    n.posicion=$('#f-posicion').value; n.serie=mayus($('#f-serie').value.trim());
+    n.estado=mayus($('#f-estado').value.trim()); n.cars=leerCars();
+    n.ubic=mayus($('#f-ubic').value.trim())||n.ubic; n.notas=mayus($('#f-notas').value.trim());
+    n.fecha=fechaGuardar;
+    if(mack && Object.values(mack).some(v=>v)) n.mack=mack;
     await persistir('nucleo', n);
-    if(n.ubic !== ubicAnt) mov(editId, ubicAnt, n.ubic, 'Cambio de ubicación (edición)');
+    if(n.ubic!==ubicAnt) mov(editId, ubicAnt, n.ubic, 'Cambio de ubicación (edición)', fechaGuardar);
     cerrarHoja(); render(); pintarUbic(); return;
   }
-  const tipo = $('#f-tipo').value, pref = tipo==='Transmisión'?'TR':'DF';
-  const f = hoy();
-  const id = `${pref}-${f.slice(0,7)}-${String(siguienteId(pref, D.nucleos)).padStart(4,'0')}`;
+  const tipo = $('#f-tipo').value;
+  const id = generarIdNucleo(tipo);
   const foto = await subirFoto(id);
-  const ubic = ($('#f-ubic').value.trim().toUpperCase()) || 'REC-01';
-  const n = { id, tipo, fecha:f, marca:$('#f-marca').value.trim(), modelo:$('#f-modelo').value.trim(),
-    serie:$('#f-serie').value.trim(), estado:$('#f-estado').value.trim(), cars:leerCars(), foto,
-    ubic, zona:'Recibido', resp: USUARIO ? USUARIO.nombre : '', notas:$('#f-notas').value.trim() };
+  const ubic = mayus($('#f-ubic').value.trim())||'REC-01';
+  const n = {
+    id, tipo, fecha:fechaGuardar,
+    marca:mayus($('#f-marca').value.trim()), modelo:mayus($('#f-modelo').value.trim()),
+    posicion:$('#f-posicion').value, serie:mayus($('#f-serie').value.trim()),
+    estado:mayus($('#f-estado').value.trim()), cars:leerCars(), foto,
+    ubic, zona:'Recibido', resp:USUARIO?USUARIO.nombre:'', notas:mayus($('#f-notas').value.trim())
+  };
+  if(mack && Object.values(mack).some(v=>v)) n.mack=mack;
   D.nucleos.unshift(n); await persistir('nucleo', n);
-  mov(id, 'Ingreso', ubic, 'Registro de núcleo recibido');
+  mov(id, 'INGRESO', ubic, 'REGISTRO DE NÚCLEO RECIBIDO', fechaGuardar);
   cerrarHoja(); tab='nucleos'; marcarTab(); render(); pintarUbic();
 }
 
+/* =====================================================================
+   RE-MANUFACTURA
+   ===================================================================== */
+function enviarARemfg(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  abrirHoja(`
+    <h2>🔧 ENVIAR A RE-MANUFACTURA <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <div class="nota-remfg">El núcleo <b>${esc(id)}</b> será marcado como "Re-manufactura" y su ubicación cambiará a TALLER ZAPOTAL. Podrá ser modificado posteriormente.</div>
+    <label>Ubicación inicial</label>
+    <input id="rm-ubic" value="TALLER ZAPOTAL" list="dl-ubic">
+    <label>Precio estimado de re-manufactura (Lps)</label>
+    <input id="rm-precio" type="number" inputmode="numeric" placeholder="Opcional">
+    <label>Notas de diagnóstico</label>
+    <textarea id="rm-notas" rows="3" placeholder="OBSERVACIONES DEL DIAGNÓSTICO…"></textarea>
+    <label>Fecha</label>
+    <input type="datetime-local" id="rm-fecha" value="${ahoraLocal()}">
+    <button class="guardar morado" onclick="confirmarRemfg('${id}')">Confirmar envío a re-manufactura</button>`);
+}
+async function confirmarRemfg(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  const ubicAnt = n.ubic;
+  const ubic = mayus($('#rm-ubic').value.trim())||'TALLER ZAPOTAL';
+  const precio = $('#rm-precio').value;
+  const notas = mayus($('#rm-notas').value.trim());
+  const fecha = $('#rm-fecha').value.slice(0,10)||hoy();
+  n.zona='Re-manufactura'; n.ubic=ubic; n.zonaRemfg=ubic;
+  if(precio) n.precioRemfg=precio;
+  if(notas) n.notasRemfg=notas;
+  await persistir('nucleo', n);
+  mov(id, ubicAnt, ubic, 'ENVIADO A RE-MANUFACTURA — '+notas, fecha);
+  cerrarHoja(); tab='remfg'; marcarTab(); render(); pintarUbic();
+}
+function devolverFlujo(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  pedirConfirm(
+    '¿Devolver al flujo?',
+    `El núcleo ${id} saldrá de re-manufactura. Podrás elegir: Desmontarlo en partes, o devolverlo como Recibido.`,
+    ()=>{
+      abrirHoja(`
+        <h2>DEVOLVER AL FLUJO <button class="x" onclick="cerrarHoja()">✕</button></h2>
+        <div class="nota-origen">Núcleo <b>${esc(id)}</b> — selecciona el estado al que regresa.</div>
+        <label>Estado</label>
+        <select id="rv-zona">
+          <option value="Recibido">Recibido — volver a evaluación</option>
+          <option value="Desmontado">Desmontado — proceder a extraer partes</option>
+          <option value="Scrap">Scrap — chatarra</option>
+        </select>
+        <label>Ubicación</label>
+        <input id="rv-ubic" value="${esc(n.ubic)}" list="dl-ubic">
+        <label>Motivo de devolución</label>
+        <textarea id="rv-notas" rows="2" placeholder="REMANUFACTURA DEMASIADO COSTOSA…"></textarea>
+        <label>Fecha</label>
+        <input type="datetime-local" id="rv-fecha" value="${ahoraLocal()}">
+        <button class="guardar" onclick="confirmarDevolucion('${id}')">Confirmar devolución</button>`);
+    }
+  );
+}
+async function confirmarDevolucion(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  const ubicAnt = n.ubic;
+  n.zona = $('#rv-zona').value;
+  n.ubic = mayus($('#rv-ubic').value.trim())||ubicAnt;
+  const motivo = mayus($('#rv-notas').value.trim())||'DEVUELTO DEL PROCESO DE RE-MANUFACTURA';
+  const fecha = $('#rv-fecha').value.slice(0,10)||hoy();
+  delete n.zonaRemfg; delete n.precioRemfg; delete n.notasRemfg;
+  await persistir('nucleo', n);
+  mov(id, 'TALLER ZAPOTAL', n.ubic, motivo, fecha);
+  cerrarHoja(); tab='nucleos'; marcarTab(); render(); pintarUbic();
+  if(n.zona==='Desmontado') formParte(id);
+}
+function venderNucleoRemfg(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  abrirHoja(`
+    <h2>💰 VENTA DE RE-MFG <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <div class="nota-remfg">Registrando venta del núcleo re-manufacturado <b>${esc(id)}</b>.</div>
+    <label>Precio de venta (Lps)</label>
+    <input id="vr-precio" type="number" inputmode="numeric" placeholder="0">
+    <label>Cliente / Referencia</label>
+    <input id="vr-cliente" placeholder="NOMBRE O REFERENCIA DEL CLIENTE">
+    <label>Fecha de venta</label>
+    <input type="datetime-local" id="vr-fecha" value="${ahoraLocal()}">
+    <label>Notas adicionales</label>
+    <textarea id="vr-notas" rows="2"></textarea>
+    <button class="guardar morado" onclick="confirmarVentaRemfg('${id}')">Confirmar venta</button>`);
+}
+async function confirmarVentaRemfg(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  const precio = $('#vr-precio').value;
+  const cliente = mayus($('#vr-cliente').value.trim());
+  const notas = mayus($('#vr-notas').value.trim());
+  const fecha = $('#vr-fecha').value.slice(0,10)||hoy();
+  n.zona='Vendido - Re-manufactura'; n.ventaRemfg={precio,cliente,fecha,notas};
+  await persistir('nucleo', n);
+  mov(id, n.ubic, 'VENTA RE-MFG', `VENDIDO A ${cliente} - L ${precio}`, fecha);
+  cerrarHoja(); render();
+  alert(`✓ Venta registrada.\nNúcleo ${id} vendido a ${cliente} por L ${Number(precio).toLocaleString()}`);
+}
+
+/* =====================================================================
+   FORMULARIO PARTE
+   ===================================================================== */
 function formParte(origen){
   abrirHoja(`
-    <h2>Nueva parte <button class="x" onclick="cerrarHoja()">✕</button></h2>
-    ${origen?`<div class="nota-origen">Origen: núcleo ${esc(origen)} — la trazabilidad queda ligada.</div>`:''}
+    <h2>NUEVA PARTE <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    ${origen?`<div class="nota-origen">ORIGEN: NÚCLEO ${esc(origen)} — trazabilidad ligada.</div>`:''}
     ${bloqueFoto()}
     <label>Tipo de pieza</label>
-    <input id="p-tipo" list="dl-piezas" placeholder="Corona-Piñón, Eje Principal…" onchange="ponSug(this.value)">
+    <input id="p-tipo" list="dl-piezas" placeholder="CORONA-PIÑÓN, COPLÍN, EJE PRINCIPAL…" oninput="onTipoParte(this.value)">
     ${origen?'':`<label>ID núcleo de origen (opcional)</label><input id="p-origen" placeholder="TR-2026-08-0001">`}
     <div class="fila2">
       <div><label>Condición</label>
-        <select id="p-cond"><option>Usado - Buen estado</option><option>Usado - Regular</option><option>Reparación requerida</option><option>Nuevo</option></select></div>
+        <select id="p-cond">
+          <option>USADO - BUEN ESTADO</option><option>USADO - REGULAR</option>
+          <option>REPARACIÓN REQUERIDA</option><option>NUEVO</option>
+        </select>
+      </div>
       <div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>
     </div>
-    <label>Ubicación / estante (Rack-Nivel-Pos)</label><input id="p-ubic" list="dl-ubic" placeholder="A3-02-05, E22…">
+    <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic" placeholder="A3-02-05, E22…">
+    <label>Fecha</label>
+    <input type="datetime-local" id="p-fecha" value="${ahoraLocal()}">
+    ${bloqueCoplin()}
+    ${bloqueCorona()}
     ${camposCars(SUG['Corona-Piñón'])}
     <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
     <button class="guardar" onclick="guardarParte(this,'${origen||''}')">Guardar parte</button>`);
 }
+function onTipoParte(val){
+  const t = mayus(val.trim());
+  ponSug(t==='COPLÍN'?'Coplín':t==='CORONA-PIÑÓN'?'Corona-Piñón':val);
+  const beC = $('#bloque-coplin');
+  const beCor = $('#bloque-corona');
+  if(beC) beC.style.display = (t==='COPLÍN')?'block':'none';
+  if(beCor) beCor.style.display = (t==='CORONA-PIÑÓN')?'block':'none';
+}
 async function guardarParte(btn, origen){
-  btn.disabled = true; btn.textContent = 'Guardando…';
-  const id = `PRT-${String(siguienteId('PRT', D.partes)).padStart(4,'0')}`;
+  btn.disabled=true; btn.textContent='Guardando…';
+  /* ID robusto con timestamp para evitar colisiones en concurrencia */
+  const id = generarId('PRT', D.partes);
   const foto = await subirFoto(id);
-  const ubic = ($('#p-ubic').value.trim().toUpperCase()) || 'DSM-01';
-  const orig = origen || ($('#p-origen') ? $('#p-origen').value.trim() : '');
-  const p = { id, origen:orig, tipo:$('#p-tipo').value.trim()||'Pieza', cond:$('#p-cond').value,
-    precio:$('#p-precio').value, cars:leerCars(), foto, ubic, fecha:hoy(), venta:'Disponible',
-    resp: USUARIO ? USUARIO.nombre : '', notas:$('#p-notas').value.trim() };
+  const ubic = mayus($('#p-ubic').value.trim())||'DSM-01';
+  const orig = origen || (mayus($('#p-origen')?.value.trim()||''));
+  const fechaVal = $('#p-fecha').value || ahoraLocal();
+  const fechaGuardar = fechaVal.slice(0,10);
+  const coplin = leerCoplin();
+  const corona = leerCorona();
+  const modelos = leerModelos();
+  const p = {
+    id, origen:orig, tipo:mayus($('#p-tipo').value.trim())||'PIEZA',
+    cond:$('#p-cond').value, precio:$('#p-precio').value,
+    cars:leerCars(), foto, ubic, fecha:fechaGuardar, venta:'Disponible',
+    resp:USUARIO?USUARIO.nombre:'', notas:mayus($('#p-notas').value.trim()),
+    modelos
+  };
+  if(coplin) p.coplin=coplin;
+  if(corona) p.corona=corona;
   D.partes.unshift(p); await persistir('parte', p);
-  mov(id, orig?('Desarme '+orig):'Ingreso', ubic, 'Parte clasificada y almacenada');
+  mov(id, orig?('DESARME '+orig):'INGRESO', ubic, 'PARTE CLASIFICADA Y ALMACENADA', fechaGuardar);
   cerrarHoja(); tab='partes'; marcarTab(); render(); pintarUbic();
 }
 
 function formEditarParte(id){
   const e = D.partes.find(x=>x.id===id); if(!e) return;
   abrirHoja(`
-    <h2>Editar ${esc(e.id)} <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <h2>EDITAR ${esc(e.id)} <button class="x" onclick="cerrarHoja()">✕</button></h2>
     ${bloqueFoto()}
     <label>Tipo de pieza</label>
-    <input id="p-tipo" list="dl-piezas">
+    <input id="p-tipo" list="dl-piezas" oninput="onTipoParte(this.value)">
     <div class="fila2">
       <div><label>Condición</label>
-        <select id="p-cond"><option>Usado - Buen estado</option><option>Usado - Regular</option><option>Reparación requerida</option><option>Nuevo</option></select></div>
+        <select id="p-cond">
+          <option>USADO - BUEN ESTADO</option><option>USADO - REGULAR</option>
+          <option>REPARACIÓN REQUERIDA</option><option>NUEVO</option>
+        </select>
+      </div>
       <div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>
     </div>
     <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic">
+    <label>Fecha del movimiento</label>
+    <input type="datetime-local" id="p-fecha" value="${e.fecha?e.fecha+'T00:00':ahoraLocal()}">
+    ${bloqueCoplin()}
+    ${bloqueCorona()}
     ${camposCars([])}
+    ${bloqueModelos(e.modelos||[])}
     <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
     <button class="guardar" onclick="guardarEdicionParte(this,'${id}')">Guardar cambios</button>`);
-  $('#p-tipo').value = e.tipo || ''; $('#p-cond').value = e.cond || 'Usado - Buen estado';
-  $('#p-precio').value = e.precio || ''; $('#p-ubic').value = e.ubic || ''; $('#p-notas').value = e.notas || '';
-  (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value = c.n||''; $('#cv'+i).value = c.v||''; });
-  if(e.foto){ const p = $('#foto-prev'); p.src = e.foto; p.style.display = 'block';
-    $('#fotobtn-txt').textContent = '✓ Ya tiene foto — tocar para cambiar'; }
+
+  $('#p-tipo').value=e.tipo||''; $('#p-cond').value=e.cond||'USADO - BUEN ESTADO';
+  $('#p-precio').value=e.precio||''; $('#p-ubic').value=e.ubic||''; $('#p-notas').value=e.notas||'';
+  (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value=c.n||''; $('#cv'+i).value=c.v||''; });
+  if(e.foto){ const p=$('#foto-prev'); p.src=e.foto; p.style.display='block'; $('#fotobtn-txt').textContent='✓ Ya tiene foto'; }
+
+  /* Mostrar bloques especiales si aplica */
+  const t = mayus(e.tipo||'');
+  if(t==='COPLÍN' && $('#bloque-coplin')){
+    $('#bloque-coplin').style.display='block';
+    if(e.coplin){ $('#coplin-th').value=e.coplin.th||''; $('#coplin-cruz').value=e.coplin.cruz||''; $('#coplin-pista').value=e.coplin.pista||''; }
+  }
+  if(t==='CORONA-PIÑÓN' && $('#bloque-corona')){
+    $('#bloque-corona').style.display='block';
+    if(e.corona){ $('#corona-ratio').value=e.corona.ratio||''; $('#corona-npc').value=e.corona.npc||''; $('#corona-npp').value=e.corona.npp||''; }
+  }
 }
 async function guardarEdicionParte(btn, id){
-  btn.disabled = true; btn.textContent = 'Guardando…';
-  const p = D.partes.find(x=>x.id===id);
-  if(!p){ cerrarHoja(); return; }
-  const nuevaFoto = await subirFoto(id);
-  if(nuevaFoto) p.foto = nuevaFoto;
+  btn.disabled=true; btn.textContent='Guardando…';
+  const p = D.partes.find(x=>x.id===id); if(!p){ cerrarHoja(); return; }
+  const nuevaFoto = await subirFoto(id); if(nuevaFoto) p.foto=nuevaFoto;
   const ubicAnt = p.ubic;
-  p.tipo = $('#p-tipo').value.trim() || p.tipo; p.cond = $('#p-cond').value;
-  p.precio = $('#p-precio').value; p.cars = leerCars();
-  p.ubic = $('#p-ubic').value.trim() || p.ubic; p.notas = $('#p-notas').value.trim();
+  const fechaVal = $('#p-fecha').value||ahoraLocal();
+  const fechaGuardar = fechaVal.slice(0,10);
+  p.tipo=mayus($('#p-tipo').value.trim())||p.tipo; p.cond=$('#p-cond').value;
+  p.precio=$('#p-precio').value; p.cars=leerCars();
+  p.ubic=mayus($('#p-ubic').value.trim())||p.ubic; p.notas=mayus($('#p-notas').value.trim());
+  p.fecha=fechaGuardar; p.modelos=leerModelos();
+  const coplin=leerCoplin(); const corona=leerCorona();
+  if(coplin) p.coplin=coplin; if(corona) p.corona=corona;
   await persistir('parte', p);
-  if(p.ubic !== ubicAnt) mov(id, ubicAnt, p.ubic, 'Cambio de ubicación (edición)');
+  if(p.ubic!==ubicAnt) mov(id, ubicAnt, p.ubic, 'CAMBIO DE UBICACIÓN (EDICIÓN)', fechaGuardar);
   cerrarHoja(); render(); pintarUbic();
 }
 
+/* verNucleoRemfg — alias que lleva a la pestaña de re-manufactura y hace scroll al núcleo */
+function verNucleoRemfg(id){
+  tab='remfg'; marcarTab(); render();
+  setTimeout(()=>{
+    const cards = document.querySelectorAll('#vista .card');
+    for(const c of cards){ if(c.innerHTML.includes(id)){ c.scrollIntoView({behavior:'smooth',block:'center'}); break; } }
+  }, 100);
+}
+
+/* =====================================================================
+   ACCIONES EN NÚCLEOS
+   ===================================================================== */
 function desarmar(id){
   const n = D.nucleos.find(x=>x.id===id); if(!n) return;
-  if(!confirm(`Desarmar ${id}: el núcleo pasa a "Desmontado" y podrás registrar sus partes. ¿Continuar?`)) return;
-  n.zona = 'Desmontado'; persistir('nucleo', n);
-  mov(id, n.ubic, n.ubic, 'Inicio de desarme — se convierte en partes');
-  render(); formParte(id);
+  if(n.zona==='Re-manufactura'){
+    alert('Este núcleo está en Re-manufactura. Usa "Devolver al flujo" para cambiar su estado antes de desmontarlo.');
+    return;
+  }
+  pedirConfirm(
+    '¿Desarmar núcleo?',
+    `${id}: el núcleo pasará a "Desmontado" y podrás registrar sus partes. ¿Continuar?`,
+    ()=>{
+      n.zona='Desmontado'; persistir('nucleo', n);
+      mov(id, n.ubic, n.ubic, 'INICIO DE DESARME — SE CONVIERTE EN PARTES');
+      render(); formParte(id);
+    }
+  );
 }
+
 function formMover(id){
-  const col = D.nucleos.find(x=>x.id===id) ? 'nucleo' : 'parte';
-  const o = D.nucleos.find(x=>x.id===id) || D.partes.find(x=>x.id===id); if(!o) return;
-  const destino = prompt(`Mover ${id}\nUbicación actual: ${o.ubic}\n\nNueva ubicación / estante:`);
-  if(!destino) return;
-  const d = destino.trim().toUpperCase();
-  mov(id, o.ubic, d, 'Traslado en bodega');
-  o.ubic = d; persistir(col, o); render(); pintarUbic();
+  const col = D.nucleos.find(x=>x.id===id)?'nucleo':'parte';
+  const o = D.nucleos.find(x=>x.id===id)||D.partes.find(x=>x.id===id); if(!o) return;
+  abrirHoja(`
+    <h2>MOVER ${esc(id)} <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <div class="meta" style="margin-bottom:8px">UBICACIÓN ACTUAL: <b>${esc(o.ubic)}</b></div>
+    <label>Nueva ubicación</label>
+    <input id="mv-ubic" list="dl-ubic" placeholder="A3-02, E22, TALLER ZAPOTAL…">
+    <label>Motivo del traslado</label>
+    <input id="mv-motivo" placeholder="TRASLADO EN BODEGA">
+    <label>Fecha</label>
+    <input type="datetime-local" id="mv-fecha" value="${ahoraLocal()}">
+    <button class="guardar" onclick="confirmarMover('${id}','${col}')">Confirmar traslado</button>`);
 }
+async function confirmarMover(id, col){
+  const o = col==='nucleo' ? D.nucleos.find(x=>x.id===id) : D.partes.find(x=>x.id===id);
+  if(!o) return;
+  const d = mayus($('#mv-ubic').value.trim()); if(!d){ alert('Escribe la ubicación destino.'); return; }
+  const motivo = mayus($('#mv-motivo').value.trim())||'TRASLADO EN BODEGA';
+  const fecha = $('#mv-fecha').value.slice(0,10)||hoy();
+  mov(id, o.ubic, d, motivo, fecha);
+  o.ubic=d; persistir(col, o); cerrarHoja(); render(); pintarUbic();
+}
+
 function marcarVendido(id){
   const p = D.partes.find(x=>x.id===id); if(!p) return;
-  p.venta = p.venta==='Vendido' ? 'Disponible':'Vendido';
-  if(p.venta==='Vendido') mov(id, p.ubic, 'VENTA', 'Parte vendida');
+  p.venta = p.venta==='Vendido'?'Disponible':'Vendido';
+  if(p.venta==='Vendido') mov(id, p.ubic, 'VENTA', 'PARTE VENDIDA');
   persistir('parte', p); render();
 }
-function borrar(col,id){
-  if(!confirm(`¿Eliminar ${id}? Esta acción no se puede deshacer.`)) return;
-  D[col] = D[col].filter(x=>x.id!==id);
-  eliminar(id); render();
+
+function borrar(col, id){
+  if(!puedeElim()){
+    alert('Solo un Supervisor o Administrador puede eliminar registros.');
+    return;
+  }
+  pedirConfirm(
+    `¿Eliminar ${id}?`,
+    `Esta acción no se puede deshacer. El registro "${id}" será eliminado permanentemente de la base de datos.`,
+    async ()=>{
+      D[col] = D[col].filter(x=>x.id!==id);
+      await eliminar(id);
+      /* Registrar el borrado en movimientos para auditoría */
+      mov('AUDIT', USUARIO?USUARIO.nombre:'?', 'ELIMINADO', `Eliminó ${col.toUpperCase()}: ${id}`);
+      render();
+    }
+  );
 }
 
-/* ================= EXPORTAR CSV ================= */
-const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',') + '\n';
+/* =====================================================================
+   EXPORTAR CSV
+   ===================================================================== */
+const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')+'\n';
 function exportar(){
   let s = '\uFEFFNÚCLEOS\n';
-  s += csvLinea(['ID','Tipo','Fecha','Marca','Modelo','Serie','Estado','Car1','Car2','Car3','Car4','Car5','Ubicación','Zona','Responsable','Foto','Notas']);
-  D.nucleos.forEach(n=> s += csvLinea([n.id,n.tipo,n.fecha,n.marca,n.modelo,n.serie,n.estado,
-    ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5), n.ubic,n.zona,n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]));
-  s += '\nPARTES\n';
-  s += csvLinea(['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Ubicación','Fecha','Precio (Lps)','Estado','Responsable','Foto','Notas']);
-  D.partes.forEach(p=> s += csvLinea([p.id,p.origen,p.tipo,p.cond,
-    ...(p.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5), p.ubic,p.fecha,p.precio,p.venta,p.resp,(p.foto&&p.foto.startsWith('http'))?p.foto:'',p.notas]));
-  s += '\nMOVIMIENTOS\n';
-  s += csvLinea(['Fecha','ID','Origen','Destino','Motivo','Responsable']);
-  D.movs.forEach(m=> s += csvLinea([m.fecha,m.ref,m.origen,m.destino,m.motivo,m.resp]));
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));
-  a.download = `inventario_bodega_${hoy()}.csv`; a.click();
+  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','Responsable','Foto','Notas']);
+  D.nucleos.forEach(n=>{ const mk=n.mack||{};
+    s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,
+      ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
+      mk.ratio||'',mk.thFlecha||'',mk.thCoplin||'',n.ubic,n.zona,n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]);
+  });
+  s+='\nPARTES\n';
+  s+=csvLinea(['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Coplín-TH','Coplín-Cruz','Coplín-Pista','Corona-Ratio','Modelos Compatibles','Ubicación','Fecha','Precio (Lps)','Estado','Responsable','Foto','Notas']);
+  D.partes.forEach(p=>{ const cp=p.coplin||{}; const cr=p.corona||{};
+    s+=csvLinea([p.id,p.origen,p.tipo,p.cond,
+      ...(p.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
+      cp.th||'',cp.cruz||'',cp.pista||'',cr.ratio||'',(p.modelos||[]).join('; '),
+      p.ubic,p.fecha,p.precio,p.venta,p.resp,(p.foto&&p.foto.startsWith('http'))?p.foto:'',p.notas]);
+  });
+  s+='\nMOVIMIENTOS\n';
+  s+=csvLinea(['Fecha','ID/Ref','Origen','Destino','Motivo','Responsable']);
+  D.movs.forEach(m=>s+=csvLinea([m.fecha,m.ref,m.origen,m.destino,m.motivo,m.resp]));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));
+  a.download=`inventario_bodega_${hoy()}.csv`; a.click();
 }
 
-/* ================= NAVEGACIÓN ================= */
+/* =====================================================================
+   NAVEGACIÓN
+   ===================================================================== */
 function marcarTab(){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
-document.querySelectorAll('nav button').forEach(b=> b.onclick = ()=>{ tab=b.dataset.tab; marcarTab(); render(); });
+document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{ tab=b.dataset.tab; limpiarFiltros(); marcarTab(); render(); });
 $('#fab').onclick = ()=> tab==='partes' ? formParte('') : formNucleo();
-$('#search').oninput = e=>{ filtro = e.target.value.toLowerCase(); render(); };
+$('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); render(); };
 $('#recargar').onclick = ()=> cargar();
 $('#hoja').onclick = e=>{ if(e.target.id==='hoja') cerrarHoja(); };
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && sb) cargar(false); });
