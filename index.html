@@ -421,7 +421,11 @@ function pedirConfirm(titulo, msg, cb){
   $('#confirm-overlay').classList.add('abierto');
 }
 function cerrarConfirm(){ $('#confirm-overlay').classList.remove('abierto'); confirmCallback = null; }
-$('#confirm-ok').onclick = ()=>{ cerrarConfirm(); if(confirmCallback) confirmCallback(); };
+$('#confirm-ok').onclick = ()=>{
+  const cb = confirmCallback;  // guardar ANTES de cerrar (cerrarConfirm lo pone en null)
+  cerrarConfirm();
+  if(cb) cb();
+};
 
 /* =====================================================================
    ALMACENAMIENTO
