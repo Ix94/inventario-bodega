@@ -870,6 +870,7 @@ function render(){
         ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formNucleo('${n.id}')">✎ Editar</button>
           <button onclick="formMover('${n.id}')">Mover</button>
+          <button onclick="duplicarNucleo('${n.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
           ${btnAccion}
           ${btnRemfg}
           ${btnElim}
@@ -902,6 +903,7 @@ function render(){
         ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
+          <button onclick="duplicarParte('${p.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
           <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Disponible':'Vendido'}</button>
           ${!enConsignacion(p)?`<button class="cons" onclick="moverAConsig('parte','${p.id}')">🏪 Consig.</button>`:`<button class="cons" style="opacity:.5" onclick="quitarDeConsig('parte','${p.id}')">↩ Quitar consig.</button>`}
           ${puedeElim()?`<button class="peligro-sup" onclick="borrar('partes','${p.id}')">✕</button>`:''}
@@ -1810,6 +1812,63 @@ function marcarVendido(id){
   p.venta = p.venta==='Vendido'?'Disponible':'Vendido';
   if(p.venta==='Vendido') mov(id, p.ubic, 'VENTA', 'PARTE VENDIDA');
   persistir('parte', p); render();
+}
+
+/* =====================================================================
+   DUPLICAR ÍTEMS
+   Copia todos los campos excepto: id, fecha (usa hoy), zona/venta
+   (vuelve a estado inicial), foto (no se copia — fotos distintas),
+   consig (la copia empieza sin consignación).
+   ===================================================================== */
+async function duplicarNucleo(id){
+  const orig = D.nucleos.find(x=>x.id===id); if(!orig) return;
+  const nuevoId = await generarIdNucleo(orig.tipo);
+  const copia = {
+    ...JSON.parse(JSON.stringify(orig)),   // deep clone
+    id:        nuevoId,
+    fecha:     hoy(),
+    zona:      'Recibido',
+    ubic:      orig.ubic,                 // misma ubicación
+    foto:      '',                        // foto nueva vacía
+    resp:      USUARIO ? USUARIO.nombre : '',
+    consig:    undefined,
+    consigHistorial: undefined,
+    ventaRemfg: undefined,
+    remfgDatos: undefined
+  };
+  /* Limpiar campos undefined para no guardar basura */
+  Object.keys(copia).forEach(k => copia[k]===undefined && delete copia[k]);
+
+  D.nucleos.unshift(copia);
+  await persistir('nucleo', copia);
+  mov(nuevoId, 'DUPLICADO DE '+id, copia.ubic, 'REGISTRO DUPLICADO DESDE '+id, hoy());
+  render();
+  /* Abrir inmediatamente el formulario de edición para que el usuario
+     pueda ajustar lo que difiere (serie, estado, foto) */
+  formNucleo(nuevoId);
+}
+
+async function duplicarParte(id){
+  const orig = D.partes.find(x=>x.id===id); if(!orig) return;
+  const nuevoId = await generarIdParte();
+  const copia = {
+    ...JSON.parse(JSON.stringify(orig)),
+    id:      nuevoId,
+    fecha:   hoy(),
+    venta:   'Disponible',
+    ubic:    orig.ubic,
+    foto:    '',
+    resp:    USUARIO ? USUARIO.nombre : '',
+    consig:  undefined,
+    consigHistorial: undefined
+  };
+  Object.keys(copia).forEach(k => copia[k]===undefined && delete copia[k]);
+
+  D.partes.unshift(copia);
+  await persistir('parte', copia);
+  mov(nuevoId, 'DUPLICADO DE '+id, copia.ubic, 'REGISTRO DUPLICADO DESDE '+id, hoy());
+  render();
+  formEditarParte(nuevoId);
 }
 
 function borrar(col, id){
