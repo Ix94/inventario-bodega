@@ -9,7 +9,7 @@
   :root{
     --concreto:#E9E6E0; --acero:#23272C; --azul:#2B5A87; --azul-osc:#1E4265;
     --naranja:#DE5A1E; --amarillo:#F5D803; --blanco:#FFFFFF; --gris:#8A8F96;
-    --ok:#2E7D46; --rojo:#B3372B; --morado:#6B3FA0; --radius:10px;
+    --ok:#2E7D46; --rojo:#B3372B; --morado:#6B3FA0; --verde-cons:#0F7B3C; --teal:#1A6B6B; --radius:10px;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
@@ -187,6 +187,22 @@
   .edad-naranja {background:#FFF0E6;color:#8C3A00;border-color:#F5A060}
   .edad-rojo    {background:#FDECEA;color:#7A1A12;border-color:#E08078}
   .filtro-btn.edad-on{background:#4A4F55;color:#fff;border-color:#9AA0A8}
+
+  /* ── CONSIGNACIÓN ── */
+  .card.cons{border-left-color:var(--verde-cons)}
+  .card.cons .id{color:var(--verde-cons)}
+  .tag.cons-tag{background:var(--verde-cons);color:#fff;border-color:#0A5C2C}
+  .estado.cons-est{color:var(--verde-cons)}
+  .nota-cons{background:#E6F4EC;border:1.5px solid var(--verde-cons);border-radius:6px;padding:8px 12px;font-size:13px;font-weight:600;margin-top:10px;color:#0A5C2C}
+  .semana-header{background:var(--acero);color:var(--amarillo);font-family:'Saira Condensed';font-size:13px;
+    font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border-radius:8px;
+    margin:14px 0 6px;display:flex;justify-content:space-between;align-items:center}
+  .semana-header .cnt{background:#31363D;border-radius:10px;padding:2px 10px;font-size:12px;color:#9AA0A8}
+  .cons-tabs{display:flex;gap:0;background:#D4D0C8;border-radius:10px;padding:3px;margin:10px 0 14px}
+  .cons-tab{flex:1;padding:8px;border:none;background:transparent;font:inherit;font-size:13px;font-weight:600;
+    letter-spacing:.05em;text-transform:uppercase;border-radius:8px;cursor:pointer;color:#565B62;transition:all .15s}
+  .cons-tab.on{background:var(--verde-cons);color:#fff}
+  .acciones button.cons{border-color:var(--verde-cons);color:var(--verde-cons)}
 </style>
 </head>
 <body>
@@ -213,6 +229,7 @@
     <button data-tab="nucleos" class="on"><span class="ic">⚙</span>Núcleos</button>
     <button data-tab="partes"><span class="ic">🔩</span>Partes</button>
     <button data-tab="remfg"><span class="ic">🔧</span>Re-Mfg</button>
+    <button data-tab="cons"><span class="ic">🏪</span>Consig.</button>
     <button data-tab="movs"><span class="ic">↔</span>Movim.</button>
     <button data-tab="resumen"><span class="ic">▦</span>Resumen</button>
   </nav>
@@ -263,6 +280,28 @@ const ADMIN_ID = 'USR-ixel-flores';
 let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
 let confirmCallback = null;
+
+/* ── CONSIGNACIÓN — helpers ── */
+function semanaKey(fechaStr){
+  /* Devuelve "YYYY-Www" de la fecha dada, o de hoy si no hay fecha */
+  const d = fechaStr ? new Date(fechaStr.length===10 ? fechaStr+'T00:00:00' : fechaStr) : new Date();
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  const startOfWeek1 = new Date(jan4);
+  startOfWeek1.setDate(jan4.getDate() - (jan4.getDay()||7) + 1);
+  const weekNum = Math.ceil(((d - startOfWeek1) / 86400000 + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNum).padStart(2,'0')}`;
+}
+function semanaLabel(key){
+  /* "2026-W34" → "Semana 34 — 2026" */
+  const [yr, wStr] = key.split('-W');
+  return `Semana ${wStr} · ${yr}`;
+}
+function enConsignacion(item){
+  return item.consig && item.consig.activo;
+}
+
+let consVista = 'todo'; // 'todo' | 'semanas'
+
 
 /* ── FILTROS STATE ── */
 let F = {
@@ -864,6 +903,7 @@ function render(){
           <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
           <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Disponible':'Vendido'}</button>
+          ${!enConsignacion(p)?`<button class="cons" onclick="moverAConsig('parte','${p.id}')">🏪 Consig.</button>`:`<button class="cons" style="opacity:.5" onclick="quitarDeConsig('parte','${p.id}')">↩ Quitar consig.</button>`}
           ${puedeElim()?`<button class="peligro-sup" onclick="borrar('partes','${p.id}')">✕</button>`:''}
         </div>`}
       </div>`).join('') :
@@ -905,13 +945,95 @@ function render(){
         ${SOLO_VER ? '' : `<div class="acciones">
           <button class="morado" onclick="editarRemfg('${n.id}')">\u2702 Datos Re-Mfg</button>
           <button onclick="formMover('${n.id}')">Mover</button>
-          <button class="warn" onclick="venderNucleoRemfg('${n.id}')">\u{1F4B0} Registrar venta</button>
+          <button class="cons" onclick="moverAConsig('nucleo','${n.id}')">🏪 Mover a Consig.</button>
           <button class="morado" onclick="devolverFlujo('${n.id}')">\u21A9 Devolver al flujo</button>
           ${puedeElim()?`<button class="peligro-sup" onclick="borrar('nucleos','${n.id}')">\u2715</button>`:''}
         </div>`}
       </div>`;
     }).join('') :
     `<div class="vacio"><b>Sin n\u00FAcleos en re-manufactura</b>Desde un n\u00FAcleo, usa el bot\u00F3n "Re-manufactura" para moverlo a este estado.</div>`);
+  }
+
+
+  else if(tab==='cons'){
+    /* ── Recolectar todo lo que está en consignación ── */
+    const nucleosCons = D.nucleos.filter(n=>enConsignacion(n));
+    const partesCons  = D.partes.filter(p=>enConsignacion(p));
+    const total = nucleosCons.length + partesCons.length;
+
+    /* Agrupar por semana de envío */
+    const porSemana = {};
+    [...nucleosCons.map(n=>({...n, _col:'nucleo'})),
+     ...partesCons.map(p=>({...p,  _col:'parte'}))].forEach(item=>{
+      const sk = item.consig?.semana || semanaKey(item.consig?.fechaEnvio);
+      if(!porSemana[sk]) porSemana[sk]=[];
+      porSemana[sk].push(item);
+    });
+    const semanas = Object.keys(porSemana).sort().reverse();
+
+    /* Tarjeta individual */
+    function cardCons(item){
+      const esNucleo = item._col==='nucleo';
+      const vendido = esNucleo ? (item.zona==='Vendido - Consignación') : (item.venta==='Vendido');
+      return `<div class="card cons" style="${vendido?'opacity:.6':''}">
+        <div class="top">
+          <span><span class="id">${esc(item.id)}</span>${edadBadge(item.fecha)}</span>
+          <span class="tag cons-tag">${esc(item.ubic)}</span>
+        </div>
+        <div class="cuerpo">${miniFoto(item)}<div class="info">
+          <h3>${esNucleo ? esc(item.marca)+' '+esc(item.modelo) : esc(item.tipo)}</h3>
+          <div class="meta">${esNucleo
+            ? esc(item.tipo)+' · SERIE '+esc(item.serie||'—')
+            : 'PARTE · '+esc(item.cond||'')}</div>
+          <div class="meta">ENVIADO: ${esc(item.consig?.fechaEnvio||'—')} ${item.consig?.resp?'· 👤 '+esc(item.consig.resp):''}</div>
+          ${item.precio||item.precioRemfg?`<div class="meta">PRECIO: <b>L ${Number(item.precio||item.precioRemfg||0).toLocaleString()}</b></div>`:''}
+        </div></div>
+        ${chips(item.cars)}
+        <div class="estado ${vendido?'scrap':'cons-est'}">● ${vendido?'VENDIDO EN CONSIGNACIÓN':'EN CONSIGNACIÓN'}</div>
+        ${SOLO_VER?'':`<div class="acciones">
+          ${!vendido
+            ? `<button class="warn" onclick="venderEnConsig('${item._col}','${item.id}')">💰 Marcar vendido</button>`
+            : `<button onclick="revertirVentaCons('${item._col}','${item.id}')">↩ Revertir venta</button>`}
+          <button onclick="quitarDeConsig('${item._col}','${item.id}')">↩ Devolver a bodega</button>
+          ${puedeElim()?`<button class="peligro-sup" onclick="borrar('${item._col==='nucleo'?'nucleos':'partes'}','${item.id}')">✕</button>`:''}
+        </div>`}
+      </div>`;
+    }
+
+    const avisoVacio = `<div class="vacio"><b>Sin ítems en consignación</b>Mueve núcleos re-manufacturados o partes a consignación usando el botón "🏪 Consig." en sus respectivas pestañas.</div>`;
+
+    /* Contar vendidos */
+    const vendidos = nucleosCons.filter(n=>n.zona==='Vendido - Consignación').length
+                   + partesCons.filter(p=>p.venta==='Vendido').length;
+
+    v.innerHTML = `
+      <div class="seccion-t" style="display:flex;justify-content:space-between;align-items:center">
+        <span>🏪 Bodega de Consignación</span>
+        <span style="font-size:12px;font-weight:400;color:#565B62">${total} ítems · ${vendidos} vendidos</span>
+      </div>
+      <!-- Sub-tabs: Todo | Por semana -->
+      <div class="cons-tabs">
+        <button class="cons-tab${consVista==='todo'?' on':''}" onclick="consVista='todo';render()">Todo en consig.</button>
+        <button class="cons-tab${consVista==='semanas'?' on':''}" onclick="consVista='semanas';render()">Por semana de envío</button>
+      </div>
+      ${total===0 ? avisoVacio :
+        consVista==='todo'
+        ? /* ── vista plana ── */
+          [...nucleosCons.map(n=>({...n,_col:'nucleo'})),
+           ...partesCons.map(p=>({...p,_col:'parte'}))]
+          .sort((a,b)=>(b.consig?.fechaEnvio||'').localeCompare(a.consig?.fechaEnvio||''))
+          .map(cardCons).join('')
+        : /* ── vista por semana ── */
+          semanas.map(sk=>{
+            const items = porSemana[sk];
+            const vend = items.filter(i=>i._col==='nucleo'?i.zona==='Vendido - Consignación':i.venta==='Vendido').length;
+            return `<div class="semana-header">
+              <span>📅 ${semanaLabel(sk)}</span>
+              <span class="cnt">${items.length} ítems · ${vend} vendidos</span>
+            </div>
+            ${items.map(cardCons).join('')}`;
+          }).join('')
+      }`;
   }
 
   else if(tab==='movs'){
@@ -951,6 +1073,7 @@ function render(){
         <div class="kpi n2"><div class="num">${dispo}</div><div class="lbl">Partes disponibles</div></div>
         <div class="kpi n2"><div class="num">L ${valor.toLocaleString()}</div><div class="lbl">Valor en partes</div></div>
         <div class="kpi n3"><div class="num">${remfgCnt}</div><div class="lbl">En re-manufactura</div></div>
+        <div class="kpi" style="border-top-color:var(--verde-cons)"><div class="num">${D.nucleos.filter(n=>enConsignacion(n)).length + D.partes.filter(p=>enConsignacion(p)).length}</div><div class="lbl">En consignación</div></div>
       </div>
       ${(obsoletosN+obsoletosP)>0?`
       <div style="background:#FDECEA;border:1.5px solid #E08078;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:13px;color:#7A1A12">
@@ -1544,6 +1667,144 @@ async function confirmarMover(id, col){
   o.ubic=d; persistir(col, o); cerrarHoja(); render(); pintarUbic();
 }
 
+
+/* =====================================================================
+   BODEGA DE CONSIGNACIÓN — funciones
+   ===================================================================== */
+
+/* Mueve una parte o núcleo a consignación */
+function moverAConsig(col, id){
+  const lista = col==='nucleo' ? D.nucleos : D.partes;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  if(enConsignacion(item)){
+    alert('Este ítem ya está en consignación.'); return;
+  }
+  abrirHoja(`
+    <h2>🏪 MOVER A CONSIGNACIÓN <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <div class="nota-cons">
+      <b>${esc(col==='nucleo'?item.marca+' '+item.modelo:item.tipo)}</b> — ${esc(id)}<br>
+      Pasará a la Bodega de Consignación. Quedará registrado con la semana de envío actual.
+    </div>
+    <label>Fecha de envío</label>
+    <input type="datetime-local" id="cs-fecha" value="${ahoraLocal()}">
+    <label>Notas (opcional)</label>
+    <textarea id="cs-notas" rows="2" placeholder="LOTE, REFERENCIA DE REMISIÓN…"></textarea>
+    <button class="guardar" style="background:var(--verde-cons)" onclick="confirmarMoverAConsig('${col}','${id}')">
+      Confirmar envío a consignación
+    </button>`);
+}
+
+async function confirmarMoverAConsig(col, id){
+  const lista = col==='nucleo' ? D.nucleos : D.partes;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  const fechaVal = $('#cs-fecha').value || ahoraLocal();
+  const fecha = fechaVal.slice(0,10);
+  const notas = mayus($('#cs-notas').value.trim());
+  const ubicAnt = item.ubic;
+
+  item.consig = {
+    activo: true,
+    fechaEnvio: fecha,
+    semana: semanaKey(fecha),
+    notas,
+    resp: USUARIO ? USUARIO.nombre : ''
+  };
+  item.ubic = 'BODEGA CONSIGNACION';
+
+  /* Para núcleos: actualizar zona */
+  if(col==='nucleo') item.zona = 'Consignación';
+
+  await persistir(col, item);
+  mov(id, ubicAnt, 'BODEGA CONSIGNACION',
+    'ENVIADO A CONSIGNACIÓN' + (notas?' — '+notas:''), fecha);
+  cerrarHoja();
+  tab='cons'; marcarTab(); render(); pintarUbic();
+}
+
+/* Marcar ítem como vendido DENTRO de consignación */
+async function venderEnConsig(col, id){
+  const lista = col==='nucleo' ? D.nucleos : D.partes;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  pedirConfirm(
+    '¿Marcar como vendido?',
+    `El ítem ${id} se marcará como vendido en consignación. Los vendedores registran el precio en su sistema.`,
+    async ()=>{
+      if(col==='nucleo'){
+        item.zona = 'Vendido - Consignación';
+      } else {
+        item.venta = 'Vendido';
+      }
+      item.consig.fechaVenta = hoy();
+      await persistir(col, item);
+      mov(id, 'BODEGA CONSIGNACION', 'VENTA CONSIGNACIÓN', 'VENDIDO EN BODEGA DE CONSIGNACIÓN');
+      render();
+    }
+  );
+}
+
+/* Revertir venta (error de registro) */
+async function revertirVentaCons(col, id){
+  const lista = col==='nucleo' ? D.nucleos : D.partes;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  pedirConfirm(
+    '¿Revertir venta?',
+    `El ítem ${id} volverá a estado "En consignación".`,
+    async ()=>{
+      if(col==='nucleo'){
+        item.zona = 'Consignación';
+      } else {
+        item.venta = 'Disponible';
+      }
+      delete item.consig.fechaVenta;
+      await persistir(col, item);
+      render();
+    }
+  );
+}
+
+/* Quitar de consignación — devolver a bodega principal */
+async function quitarDeConsig(col, id){
+  const lista = col==='nucleo' ? D.nucleos : D.partes;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  if(!enConsignacion(item)){ render(); return; }
+  abrirHoja(`
+    <h2>↩ DEVOLVER A BODEGA <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <div class="nota-cons" style="background:#FFF0E6;border-color:var(--naranja);color:#5C2A00">
+      El ítem <b>${esc(id)}</b> saldrá de consignación y volverá al inventario de bodega.
+    </div>
+    <label>Motivo de devolución</label>
+    <textarea id="qc-motivo" rows="2" placeholder="CLIENTE RECHAZÓ, EXCESO DE INVENTARIO…"></textarea>
+    <label>Ubicación destino</label>
+    <input id="qc-ubic" list="dl-ubic" placeholder="A20, DSM-01…">
+    <label>Fecha</label>
+    <input type="datetime-local" id="qc-fecha" value="${ahoraLocal()}">
+    <button class="guardar" style="background:var(--naranja)" onclick="confirmarQuitarConsig('${col}','${id}')">
+      Confirmar devolución a bodega
+    </button>`);
+}
+
+async function confirmarQuitarConsig(col, id){
+  const lista = col==='nucleo' ? D.nucleos : D.partes;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  const motivo = mayus($('#qc-motivo').value.trim()) || 'DEVUELTO DE CONSIGNACIÓN';
+  const ubic   = mayus($('#qc-ubic').value.trim()) || 'REC-01';
+  const fecha  = $('#qc-fecha').value.slice(0,10) || hoy();
+  const ubicAnt = item.ubic;
+
+  /* Guardar historial en el propio objeto */
+  if(!item.consigHistorial) item.consigHistorial = [];
+  item.consigHistorial.push({ ...item.consig, fechaRetiro:fecha, motivo });
+
+  item.consig = { activo:false };
+  item.ubic = ubic;
+  if(col==='nucleo') item.zona = 'Recibido';
+  if(col==='parte')  item.venta = 'Disponible';
+
+  await persistir(col, item);
+  mov(id, ubicAnt, ubic, 'DEVUELTO DE CONSIGNACIÓN — '+motivo, fecha);
+  cerrarHoja(); tab='cons'; marcarTab(); render(); pintarUbic();
+}
+
 function marcarVendido(id){
   const p = D.partes.find(x=>x.id===id); if(!p) return;
   p.venta = p.venta==='Vendido'?'Disponible':'Vendido';
@@ -1575,19 +1836,19 @@ function borrar(col, id){
 const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')+'\n';
 function exportar(){
   let s = '\uFEFFNÚCLEOS\n';
-  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','Responsable','Foto','Notas']);
+  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
   D.nucleos.forEach(n=>{ const mk=n.mack||{};
     s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,
       ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
-      mk.ratio||'',mk.thFlecha||'',mk.thCoplin||'',n.ubic,n.zona,n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]);
+      mk.ratio||'',mk.thFlecha||'',mk.thCoplin||'',n.ubic,n.zona,enConsignacion(n)?'SÍ':'NO',n.consig?.fechaEnvio||'',n.consig?.semana||'',n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]);
   });
   s+='\nPARTES\n';
-  s+=csvLinea(['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Coplín-TH','Coplín-Cruz','Coplín-Pista','Corona-Ratio','Modelos Compatibles','Ubicación','Fecha','Precio (Lps)','Estado','Responsable','Foto','Notas']);
+  s+=csvLinea(['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Coplín-TH','Coplín-Cruz','Coplín-Pista','Corona-Ratio','Modelos Compatibles','Ubicación','Fecha','Precio (Lps)','Estado','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
   D.partes.forEach(p=>{ const cp=p.coplin||{}; const cr=p.corona||{};
     s+=csvLinea([p.id,p.origen,p.tipo,p.cond,
       ...(p.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
       cp.th||'',cp.cruz||'',cp.pista||'',cr.ratio||'',(p.modelos||[]).join('; '),
-      p.ubic,p.fecha,p.precio,p.venta,p.resp,(p.foto&&p.foto.startsWith('http'))?p.foto:'',p.notas]);
+      p.ubic,p.fecha,p.precio,p.venta,enConsignacion(p)?'SÍ':'NO',p.consig?.fechaEnvio||'',p.consig?.semana||'',p.resp,(p.foto&&p.foto.startsWith('http'))?p.foto:'',p.notas]);
   });
   s+='\nMOVIMIENTOS\n';
   s+=csvLinea(['Fecha','ID/Ref','Origen','Destino','Motivo','Responsable']);
