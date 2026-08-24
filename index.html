@@ -802,28 +802,43 @@ function render(){
 
   else if(tab==='remfg'){
     const lista = D.nucleos.filter(n=>n.zona==='Re-manufactura');
-    v.innerHTML = `<div class="seccion-t">🔧 Núcleos en Re-manufactura</div>
-      <div class="aviso-morado">Estos núcleos están en proceso de re-manufactura. Pueden venderse como unidad completa o ser devueltos al flujo normal.</div>` +
-    (lista.length ? lista.map(n=>`
-      <div class="card remfg">
+    v.innerHTML = `<div class="seccion-t">\u{1F527} N\u00FAcleos en Re-manufactura</div>
+      <div class="aviso-morado">Precio y fechas del proceso se editan desde cada n\u00FAcleo con "\u2702 Datos Re-Mfg".</div>` +
+    (lista.length ? lista.map(n=>{
+      const d = n.remfgDatos || {};
+      const precio = d.precio || n.precioRemfg || '';
+      const fechas = [
+        d.fechaIngreso     ? `\u{1F4E5} INGRESO: <b>${esc(d.fechaIngreso)}</b>`         : '',
+        d.fechaDiagnostico ? `\u{1F50D} DIAGN\u00D3STICO: <b>${esc(d.fechaDiagnostico)}</b>` : '',
+        d.fechaRepuestos   ? `\u{1F4E6} REPUESTOS: <b>${esc(d.fechaRepuestos)}</b>`      : '',
+        d.fechaCompletado  ? `\u2705 COMPLETADO: <b>${esc(d.fechaCompletado)}</b>`       : ''
+      ].filter(Boolean);
+      return `<div class="card remfg">
         <div class="top"><span class="id">${esc(n.id)}</span><span class="tag remfg-tag">${esc(n.ubic)}</span></div>
         <div class="cuerpo">${miniFoto(n)}<div class="info">
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
-          <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')}</div>
-          <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
-          ${n.precioRemfg?`<div class="meta"><b>PRECIO RE-MFG: L ${Number(n.precioRemfg).toLocaleString()}</b></div>`:''}
+          <div class="meta">${esc(n.tipo)} \u00B7 SERIE ${esc(n.serie||'\u2014')}</div>
+          <div class="meta">${esc(n.estado||'')} ${n.resp?'\u00B7 \u{1F464} '+esc(n.resp):''}</div>
+          ${precio
+            ? `<div class="meta" style="color:var(--morado);font-weight:700">PRECIO RE-MFG: L ${Number(precio).toLocaleString()}</div>`
+            : `<div class="meta" style="color:#9B59D0;font-style:italic">\u26A0 Precio pendiente de diagn\u00F3stico</div>`}
+          ${fechas.length
+            ? `<div class="meta" style="font-size:12px;margin-top:4px;line-height:1.9">${fechas.join('<br>')}</div>`
+            : `<div class="meta" style="font-size:12px;color:#9B59D0">Sin fechas de proceso registradas</div>`}
+          ${d.notasDiagnostico ? `<div class="meta" style="font-size:12px;margin-top:3px">\u{1F4CB} ${esc(d.notasDiagnostico)}</div>` : ''}
         </div></div>
         ${chips(n.cars)}
-        <div class="estado remfg-est">● ${esc(n.zonaRemfg||'TALLER ZAPOTAL')}</div>
+        <div class="estado remfg-est">\u25CF RE-MANUFACTURA</div>
         ${SOLO_VER ? '' : `<div class="acciones">
-          <button onclick="formNucleo('${n.id}')">✎ Editar</button>
-          <button onclick="formMover('${n.id}')">Mover ubicación</button>
-          <button class="warn" onclick="venderNucleoRemfg('${n.id}')">💰 Registrar venta</button>
-          <button class="morado" onclick="devolverFlujo('${n.id}')">↩ Devolver al flujo</button>
-          ${puedeElim()?`<button class="peligro-sup" onclick="borrar('nucleos','${n.id}')">✕</button>`:''}
+          <button class="morado" onclick="editarRemfg('${n.id}')">\u2702 Datos Re-Mfg</button>
+          <button onclick="formMover('${n.id}')">Mover</button>
+          <button class="warn" onclick="venderNucleoRemfg('${n.id}')">\u{1F4B0} Registrar venta</button>
+          <button class="morado" onclick="devolverFlujo('${n.id}')">\u21A9 Devolver al flujo</button>
+          ${puedeElim()?`<button class="peligro-sup" onclick="borrar('nucleos','${n.id}')">\u2715</button>`:''}
         </div>`}
-      </div>`).join('') :
-    `<div class="vacio"><b>Sin núcleos en re-manufactura</b>Desde un núcleo, usa el botón "Re-manufactura" para moverlo a este estado.</div>`);
+      </div>`;
+    }).join('') :
+    `<div class="vacio"><b>Sin n\u00FAcleos en re-manufactura</b>Desde un n\u00FAcleo, usa el bot\u00F3n "Re-manufactura" para moverlo a este estado.</div>`);
   }
 
   else if(tab==='movs'){
@@ -1086,14 +1101,12 @@ function enviarARemfg(id){
   const n = D.nucleos.find(x=>x.id===id); if(!n) return;
   abrirHoja(`
     <h2>🔧 ENVIAR A RE-MANUFACTURA <button class="x" onclick="cerrarHoja()">✕</button></h2>
-    <div class="nota-remfg">El núcleo <b>${esc(id)}</b> será marcado como "Re-manufactura" y su ubicación cambiará a TALLER ZAPOTAL. Podrá ser modificado posteriormente.</div>
+    <div class="nota-remfg">El núcleo <b>${esc(id)}</b> será marcado como "Re-manufactura" y su ubicación cambiará a TALLER ZAPOTAL. El precio y fechas de proceso se registran después del diagnóstico.</div>
     <label>Ubicación inicial</label>
     <input id="rm-ubic" value="TALLER ZAPOTAL" list="dl-ubic">
-    <label>Precio estimado de re-manufactura (Lps)</label>
-    <input id="rm-precio" type="number" inputmode="numeric" placeholder="Opcional">
-    <label>Notas de diagnóstico</label>
-    <textarea id="rm-notas" rows="3" placeholder="OBSERVACIONES DEL DIAGNÓSTICO…"></textarea>
-    <label>Fecha</label>
+    <label>Observaciones iniciales (opcional)</label>
+    <textarea id="rm-notas" rows="2" placeholder="ESTADO AL INGRESO A TALLER…"></textarea>
+    <label>Fecha de ingreso a taller</label>
     <input type="datetime-local" id="rm-fecha" value="${ahoraLocal()}">
     <button class="guardar morado" onclick="confirmarRemfg('${id}')">Confirmar envío a re-manufactura</button>`);
 }
@@ -1101,16 +1114,87 @@ async function confirmarRemfg(id){
   const n = D.nucleos.find(x=>x.id===id); if(!n) return;
   const ubicAnt = n.ubic;
   const ubic = mayus($('#rm-ubic').value.trim())||'TALLER ZAPOTAL';
-  const precio = $('#rm-precio').value;
   const notas = mayus($('#rm-notas').value.trim());
   const fecha = $('#rm-fecha').value.slice(0,10)||hoy();
   n.zona='Re-manufactura'; n.ubic=ubic; n.zonaRemfg=ubic;
-  if(precio) n.precioRemfg=precio;
-  if(notas) n.notasRemfg=notas;
+  /* Inicializar objeto de fechas de proceso */
+  n.remfgDatos = {
+    fechaIngreso: fecha,
+    notasIngreso: notas,
+    fechaDiagnostico: '',
+    fechaRepuestos: '',
+    fechaCompletado: '',
+    precio: '',
+    notasDiagnostico: ''
+  };
   await persistir('nucleo', n);
-  mov(id, ubicAnt, ubic, 'ENVIADO A RE-MANUFACTURA — '+notas, fecha);
+  mov(id, ubicAnt, ubic, 'ENVIADO A RE-MANUFACTURA' + (notas?' — '+notas:''), fecha);
   cerrarHoja(); tab='remfg'; marcarTab(); render(); pintarUbic();
 }
+function editarRemfg(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  const d = n.remfgDatos || {};
+  abrirHoja(`
+    <h2>🔧 DATOS RE-MANUFACTURA <button class="x" onclick="cerrarHoja()">✕</button></h2>
+    <div class="nota-remfg"><b>${esc(n.marca)} ${esc(n.modelo)}</b> · ${esc(id)}</div>
+
+    <div class="carbloque" style="background:#EDE5F7;border:1.5px solid var(--morado)">
+      <div class="titulo" style="color:var(--morado)">💰 Costos</div>
+      <label>Precio de re-manufactura (Lps)</label>
+      <input id="re-precio" type="number" inputmode="numeric" placeholder="0" value="${esc(d.precio||'')}">
+      <label>Notas de cotización / diagnóstico</label>
+      <textarea id="re-notas-diag" rows="3" placeholder="REPUESTOS REQUERIDOS, COSTO DE MANO DE OBRA…">${esc(d.notasDiagnostico||'')}</textarea>
+    </div>
+
+    <div class="carbloque" style="background:#EDE5F7;border:1.5px solid var(--morado);margin-top:10px">
+      <div class="titulo" style="color:var(--morado)">📅 Fechas del proceso</div>
+      <div class="fila2">
+        <div>
+          <label>Fecha de ingreso</label>
+          <input type="date" id="re-f-ingreso" value="${esc(d.fechaIngreso||'')}">
+        </div>
+        <div>
+          <label>Fecha de diagnóstico</label>
+          <input type="date" id="re-f-diagnostico" value="${esc(d.fechaDiagnostico||'')}">
+        </div>
+      </div>
+      <div class="fila2" style="margin-top:8px">
+        <div>
+          <label>Fecha entrega repuestos</label>
+          <input type="date" id="re-f-repuestos" value="${esc(d.fechaRepuestos||'')}">
+        </div>
+        <div>
+          <label>Fecha completado</label>
+          <input type="date" id="re-f-completado" value="${esc(d.fechaCompletado||'')}">
+        </div>
+      </div>
+    </div>
+
+    <label style="margin-top:14px">Ubicación actual</label>
+    <input id="re-ubic" value="${esc(n.ubic||'TALLER ZAPOTAL')}" list="dl-ubic">
+    <button class="guardar morado" onclick="guardarDatosRemfg('${id}')">Guardar cambios</button>`);
+}
+async function guardarDatosRemfg(id){
+  const n = D.nucleos.find(x=>x.id===id); if(!n) return;
+  const ubicAnt = n.ubic;
+  const ubic = mayus($('#re-ubic').value.trim())||n.ubic;
+  n.ubic = ubic;
+  n.remfgDatos = {
+    fechaIngreso:      $('#re-f-ingreso').value     || (n.remfgDatos?.fechaIngreso||''),
+    fechaDiagnostico:  $('#re-f-diagnostico').value || '',
+    fechaRepuestos:    $('#re-f-repuestos').value   || '',
+    fechaCompletado:   $('#re-f-completado').value  || '',
+    precio:            $('#re-precio').value         || '',
+    notasDiagnostico:  mayus($('#re-notas-diag').value.trim()),
+    notasIngreso:      n.remfgDatos?.notasIngreso   || ''
+  };
+  /* Compatibilidad hacia atrás: también actualizar campo legacy */
+  n.precioRemfg = n.remfgDatos.precio;
+  await persistir('nucleo', n);
+  if(ubic !== ubicAnt) mov(id, ubicAnt, ubic, 'CAMBIO DE UBICACIÓN EN RE-MANUFACTURA');
+  cerrarHoja(); render();
+}
+
 function devolverFlujo(id){
   const n = D.nucleos.find(x=>x.id===id); if(!n) return;
   pedirConfirm(
