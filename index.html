@@ -526,19 +526,40 @@ async function cargar(mostrar=true){
   if(!sb){ dot('#3FBF6A'); if(!USUARIO) pedirUsuario(); return; }
   dot('#E8A400');
   try{
-    const { data, error } = await sb.from('bodega').select('id,col,data').limit(10000);
-    if(error) throw error;
+    /* ── Paginación real — Supabase devuelve máx. 1000 filas por llamada ── */
+    const BLOQUE = 1000;
+    let todas = [];
+    let desde = 0;
+    $('#modo').textContent = '· CARGANDO…';
+    while(true){
+      const { data, error } = await sb
+        .from('bodega')
+        .select('id,col,data')
+        .order('id', { ascending: true })   // orden estable y consistente
+        .range(desde, desde + BLOQUE - 1);
+      if(error) throw error;
+      todas = todas.concat(data || []);
+      if(!data || data.length < BLOQUE) break;  // última página
+      desde += BLOQUE;
+    }
+
     D = { nucleos:[], partes:[], movs:[], usuarios:[] };
-    for(const fila of data){
-      if(fila.col==='nucleo')   D.nucleos.push(fila.data);
+    for(const fila of todas){
+      if(fila.col==='nucleo')        D.nucleos.push(fila.data);
       else if(fila.col==='parte')    D.partes.push(fila.data);
       else if(fila.col==='mov')      D.movs.push(fila.data);
       else if(fila.col==='usuario')  D.usuarios.push(fila.data);
     }
-    D.nucleos.sort((a,b)=>(b.id>a.id?1:-1));
-    D.partes.sort((a,b)=>(b.id>a.id?1:-1));
-    D.movs.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
-    cacheLocal(); dot('#3FBF6A'); render(); pintarUbic();
+    /* Ordenar partes/núcleos de más nuevo a más viejo numéricamente */
+    const numId = id => parseInt((id||'').replace(/[^0-9]/g,'').slice(-6)||'0', 10);
+    D.nucleos.sort((a,b) => numId(b.id) - numId(a.id));
+    D.partes.sort((a,b)  => numId(b.id) - numId(a.id));
+    D.movs.sort((a,b)    => (b.ts||'').localeCompare(a.ts||''));
+
+    cacheLocal(); dot('#3FBF6A');
+    $('#modo').textContent = '· BASE COMPARTIDA';
+    render(); pintarUbic();
+    console.log(`Cargados: ${D.nucleos.length} núcleos, ${D.partes.length} partes, ${D.movs.length} movs, ${D.usuarios.length} usuarios`);
   }catch(e){ dot('#D24B3F'); console.error('Supabase:', e); }
   if(!USUARIO) pedirUsuario();
 }
@@ -548,7 +569,7 @@ async function persistir(col, obj){
   if(!sb){ dot('#3FBF6A'); return; }
   dot('#E8A400');
   try{
-    const { error } = await sb.from('bodega').upsert({ id: obj.id, col, data: obj, updated_at: new Date().toISOString() });
+    const { error } = await sb.from('bodega').upsert({ id: obj.id, col, data: obj });
     if(error) throw error;
     dot('#3FBF6A');
   }catch(e){ dot('#D24B3F'); alert('No se pudo guardar en la base compartida. Revisa internet y toca ⟳.\n\nEl dato quedó guardado en este dispositivo.'); }
