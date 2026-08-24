@@ -177,6 +177,16 @@
   .mov .f{color:#7A7F86;font-size:11px}
   .seccion-t{font-family:'Saira Condensed';font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:18px 0 8px;color:#3C4148}
   @media (min-width:600px){ .kpis{grid-template-columns:repeat(4,1fr)} }
+
+  /* ── ANTIGÜEDAD ── */
+  .edad-badge{display:inline-flex;align-items:center;gap:4px;border-radius:12px;padding:2px 9px;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.02em;
+    border:1.5px solid transparent;white-space:nowrap;margin-left:4px;vertical-align:middle}
+  .edad-verde   {background:#E8F5EC;color:#1E6B35;border-color:#A8D5B5}
+  .edad-amarillo{background:#FFFBEA;color:#7A6000;border-color:#E8D000}
+  .edad-naranja {background:#FFF0E6;color:#8C3A00;border-color:#F5A060}
+  .edad-rojo    {background:#FDECEA;color:#7A1A12;border-color:#E08078}
+  .filtro-btn.edad-on{background:#4A4F55;color:#fff;border-color:#9AA0A8}
 </style>
 </head>
 <body>
@@ -260,8 +270,39 @@ let F = {
   posicion: '',  // 'Delantero' | 'Trasero'
   marca: '',     // 'MERITOR'|'EATON'|'INTERNATIONAL'|'MACK'
   parteTipo: '', // texto libre por tipo de pieza
-  car1: '', car2: '', car3: ''
+  car1: '', car2: '', car3: '',
+  edad: ''       // ''|'<3m'|'3-6m'|'6-12m'|'>1a'
 };
+
+/* ── ANTIGÜEDAD — helpers ── */
+const EDAD_RANGOS = [
+  { key:'<3m',   label:'< 3 meses',  dias:[0,   89],  cls:'edad-verde'    },
+  { key:'3-6m',  label:'3–6 meses',  dias:[90,  179], cls:'edad-amarillo' },
+  { key:'6-12m', label:'6–12 meses', dias:[180, 364], cls:'edad-naranja'  },
+  { key:'>1a',   label:'> 1 año',    dias:[365, Infinity], cls:'edad-rojo' }
+];
+
+function diasDesde(fechaStr){
+  if(!fechaStr) return 0;
+  const f = new Date(fechaStr + (fechaStr.length===10 ? 'T00:00:00' : ''));
+  return Math.floor((Date.now() - f.getTime()) / 86400000);
+}
+
+function edadInfo(fechaStr){
+  const d = diasDesde(fechaStr);
+  return EDAD_RANGOS.find(r => d >= r.dias[0] && d <= r.dias[1])
+      || EDAD_RANGOS[EDAD_RANGOS.length-1];
+}
+
+function edadBadge(fechaStr){
+  if(!fechaStr) return '';
+  const d = diasDesde(fechaStr);
+  const info = edadInfo(fechaStr);
+  const txt = d < 30  ? `${d}d`
+             : d < 365 ? `${Math.floor(d/30)}m`
+             : `${(d/365).toFixed(1)}a`;
+  return `<span class="edad-badge ${info.cls}" title="${d} días en inventario">⏱ ${txt}</span>`;
+}
 
 /* Mapa de marcas cabeza → submarcas que incluye */
 const MARCAS_MAPA = {
@@ -644,15 +685,22 @@ function marcaCoincide(marcaRegistro, filtroCabeza){
   return sub.some(s => mr.includes(s));
 }
 
+function edadCoincide(fechaStr){
+  if(!F.edad) return true;
+  const rango = EDAD_RANGOS.find(r=>r.key===F.edad);
+  if(!rango) return true;
+  const d = diasDesde(fechaStr);
+  return d >= rango.dias[0] && d <= rango.dias[1];
+}
 function coincideNucleo(n){
   if(F.tipo && n.tipo !== F.tipo) return false;
   if(F.posicion){
     const cars = (n.cars||[]).map(c=>mayus(c.v||''));
-    const notas = mayus(n.notas||'');
     const posStr = F.posicion.toUpperCase();
-    if(!cars.some(v=>v.includes(posStr)) && !notas.includes(posStr)) return false;
+    if(!cars.some(v=>v.includes(posStr)) && !mayus(n.notas||'').includes(posStr) && mayus(n.posicion||'')!==posStr) return false;
   }
   if(F.marca && !marcaCoincide(n.marca, F.marca)) return false;
+  if(F.edad && !edadCoincide(n.fecha)) return false;
   if(filtro && !JSON.stringify(n).toUpperCase().includes(filtro)) return false;
   return true;
 }
@@ -662,6 +710,7 @@ function coincideParte(p){
   if(F.car1 && !mayus(cars[0]?.v||'').includes(F.car1.toUpperCase())) return false;
   if(F.car2 && !mayus(cars[1]?.v||'').includes(F.car2.toUpperCase())) return false;
   if(F.car3 && !mayus(cars[2]?.v||'').includes(F.car3.toUpperCase())) return false;
+  if(F.edad && !edadCoincide(p.fecha)) return false;
   if(filtro && !JSON.stringify(p).toUpperCase().includes(filtro)) return false;
   return true;
 }
@@ -669,6 +718,21 @@ function coincideParte(p){
 /* =====================================================================
    FILTROS — render de la barra
    ===================================================================== */
+/* Fila compartida de filtro de antigüedad — se inserta en ambas pestañas */
+function filaEdad(){
+  return `<div class="fila-filtro" style="border-top:1px solid #2C3138;margin-top:4px;padding-top:6px">
+    <span class="filtro-label">Antigüedad:</span>
+    ${EDAD_RANGOS.map(r=>`
+      <button class="filtro-btn${F.edad===r.key?' edad-on':''}"
+        onclick="setF('edad','${r.key}')"
+        style="font-size:11px;${F.edad===r.key?'':''}">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${
+          r.cls==='edad-verde'?'#2E7D46':r.cls==='edad-amarillo'?'#C9B300':r.cls==='edad-naranja'?'#DE5A1E':'#B3372B'
+        };margin-right:4px;vertical-align:middle"></span>${r.label}</button>`).join('')}
+    ${F.edad?`<button class="filtro-btn" onclick="setF('edad','')" style="font-size:11px;color:#9AA0A8">✕ Quitar</button>`:''}
+  </div>`;
+}
+
 function renderFiltros(){
   const wrap = $('#filtros-wrap');
   if(tab==='nucleos'){
@@ -688,10 +752,10 @@ function renderFiltros(){
         <span class="filtro-label" style="margin-left:6px">Marca:</span>
         ${MARCAS_CABEZA.map(m=>`
           <button class="filtro-btn${F.marca===m?' marca-on':''}" onclick="setF('marca','${m}')">${m}</button>`).join('')}
-      </div>`;
+      </div>
+      ${filaEdad()}`;
   } else if(tab==='partes'){
     const tiposExistentes = [...new Set(D.partes.map(p=>mayus(p.tipo||'')).filter(Boolean))].slice(0,8);
-    /* Obtener nombres de car1/car2/car3 del primer registro como referencia */
     const ejCars = D.partes[0]?.cars||[];
     const lbl1 = ejCars[0]?.n||'CAR 1';
     const lbl2 = ejCars[1]?.n||'CAR 2';
@@ -706,7 +770,8 @@ function renderFiltros(){
         <input placeholder="${esc(lbl1)}…" value="${esc(F.car1)}" oninput="setF('car1',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
         <input placeholder="${esc(lbl2)}…" value="${esc(F.car2)}" oninput="setF('car2',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
         <input placeholder="${esc(lbl3)}…" value="${esc(F.car3)}" oninput="setF('car3',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
-      </div>`;
+      </div>
+      ${filaEdad()}`;
   } else {
     wrap.innerHTML = '';
   }
@@ -717,7 +782,7 @@ function setF(key, val){
   renderFiltros(); render();
 }
 function limpiarFiltros(){
-  F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:''};
+  F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:'',edad:''};
   renderFiltros(); render();
 }
 
@@ -752,7 +817,10 @@ function render(){
       const btnRemfg = (!esRemfg && !SOLO_VER)
         ? `<button class="morado" onclick="enviarARemfg('${n.id}')">🔧 Re-manufactura</button>` : '';
       return `<div class="card${esRemfg?' remfg':''}">
-        <div class="top"><span class="id">${esc(n.id)}</span><span class="tag${esRemfg?' remfg-tag':''}">${esc(n.ubic)}</span></div>
+        <div class="top">
+          <span><span class="id">${esc(n.id)}</span>${edadBadge(n.fecha)}</span>
+          <span class="tag${esRemfg?' remfg-tag':''}">${esc(n.ubic)}</span>
+        </div>
         <div class="cuerpo">${miniFoto(n)}<div class="info">
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
           <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
@@ -769,8 +837,9 @@ function render(){
         </div>`}
       </div>`;
     }).join('') :
-    `<div class="vacio"><b>Sin núcleos${(filtro||F.tipo||F.posicion||F.marca)?' que coincidan':''}</b>
-      ${(F.tipo||F.posicion||F.marca)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--azul);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Toca + para registrar la primera transmisión o diferencial.'}
+    `<div class="vacio"><b>Sin núcleos${(filtro||F.tipo||F.posicion||F.marca||F.edad)?' que coincidan':''}</b>
+      ${F.edad?`<div style="margin:6px 0;font-size:13px">Filtro activo: antigüedad <b>${EDAD_RANGOS.find(r=>r.key===F.edad)?.label||F.edad}</b></div>`:''}
+      ${(F.tipo||F.posicion||F.marca||F.edad)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--azul);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Toca + para registrar la primera transmisión o diferencial.'}
     </div>`);
   }
 
@@ -778,7 +847,10 @@ function render(){
     const lista = D.partes.filter(coincideParte);
     v.innerHTML = avisoConfig + (lista.length ? lista.map(p=>`
       <div class="card parte">
-        <div class="top"><span class="id">${esc(p.id)}</span><span class="tag">${esc(p.ubic)}</span></div>
+        <div class="top">
+          <span><span class="id">${esc(p.id)}</span>${edadBadge(p.fecha)}</span>
+          <span class="tag">${esc(p.ubic)}</span>
+        </div>
         <div class="cuerpo">${miniFoto(p)}<div class="info">
           <h3>${esc(p.tipo)}</h3>
           <div class="meta">ORIGEN: <b>${esc(p.origen||'—')}</b> · ${esc(p.cond||'')}</div>
@@ -795,8 +867,9 @@ function render(){
           ${puedeElim()?`<button class="peligro-sup" onclick="borrar('partes','${p.id}')">✕</button>`:''}
         </div>`}
       </div>`).join('') :
-    `<div class="vacio"><b>Sin partes${(filtro||F.parteTipo||F.car1||F.car2||F.car3)?' que coincidan':''}</b>
-      ${(F.parteTipo||F.car1||F.car2||F.car3)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--naranja);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Desarma un núcleo o toca + para registrar una parte suelta.'}
+    `<div class="vacio"><b>Sin partes${(filtro||F.parteTipo||F.car1||F.car2||F.car3||F.edad)?' que coincidan':''}</b>
+      ${F.edad?`<div style="margin:6px 0;font-size:13px">Filtro activo: antigüedad <b>${EDAD_RANGOS.find(r=>r.key===F.edad)?.label||F.edad}</b></div>`:''}
+      ${(F.parteTipo||F.car1||F.car2||F.car3||F.edad)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--naranja);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Desarma un núcleo o toca + para registrar una parte suelta.'}
     </div>`);
   }
 
@@ -857,6 +930,20 @@ function render(){
     const remfgCnt = D.nucleos.filter(n=>n.zona==='Re-manufactura').length;
     const dispo = D.partes.filter(p=>p.venta!=='Vendido').length;
     const valor = D.partes.filter(p=>p.venta!=='Vendido').reduce((s,p)=>s+(Number(p.precio)||0),0);
+
+    /* Calcular distribución de antigüedad */
+    const edadNucleos = EDAD_RANGOS.map(r=>({
+      ...r,
+      cnt: D.nucleos.filter(n=>{ const d=diasDesde(n.fecha); return d>=r.dias[0]&&d<=r.dias[1]; }).length
+    }));
+    const edadPartes = EDAD_RANGOS.map(r=>({
+      ...r,
+      cnt: D.partes.filter(p=>{ const d=diasDesde(p.fecha); return d>=r.dias[0]&&d<=r.dias[1]; }).length
+    }));
+    /* Items con > 1 año que siguen disponibles = candidatos a limpiar */
+    const obsoletosN = edadNucleos.find(r=>r.key==='>1a')?.cnt||0;
+    const obsoletosP = edadPartes.find(r=>r.key==='>1a')?.cnt||0;
+
     v.innerHTML = `
       <div class="kpis">
         <div class="kpi"><div class="num">${nd}</div><div class="lbl">Núcleos totales</div></div>
@@ -865,6 +952,35 @@ function render(){
         <div class="kpi n2"><div class="num">L ${valor.toLocaleString()}</div><div class="lbl">Valor en partes</div></div>
         <div class="kpi n3"><div class="num">${remfgCnt}</div><div class="lbl">En re-manufactura</div></div>
       </div>
+      ${(obsoletosN+obsoletosP)>0?`
+      <div style="background:#FDECEA;border:1.5px solid #E08078;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:13px;color:#7A1A12">
+        ⚠ <b>${obsoletosN+obsoletosP} item${obsoletosN+obsoletosP>1?'s':''} con más de 1 año</b> en inventario sin venta —
+        ${obsoletosN} núcleo${obsoletosN!==1?'s':''}, ${obsoletosP} parte${obsoletosP!==1?'s':''}.
+        Considera revisarlos para rotación o scrap.
+      </div>`:''}
+
+      <div class="seccion-t">Antigüedad del inventario</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#4A4F55;text-align:center">Núcleos</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#4A4F55;text-align:center">Partes</div>
+      </div>
+      ${EDAD_RANGOS.map((r,i)=>{
+        const cn = edadNucleos[i].cnt, cp = edadPartes[i].cnt;
+        const color = r.cls==='edad-verde'?'#2E7D46':r.cls==='edad-amarillo'?'#C9B300':r.cls==='edad-naranja'?'#DE5A1E':'#B3372B';
+        const bg    = r.cls==='edad-verde'?'#E8F5EC':r.cls==='edad-amarillo'?'#FFFBEA':r.cls==='edad-naranja'?'#FFF0E6':'#FDECEA';
+        return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+          <div style="background:${bg};border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="tab='nucleos';marcarTab();setF('edad','${r.key}')">
+            <span style="font-size:12px;color:${color};font-weight:600">${r.label}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:${color}">${cn}</span>
+          </div>
+          <div style="background:${bg};border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="tab='partes';marcarTab();setF('edad','${r.key}')">
+            <span style="font-size:12px;color:${color};font-weight:600">${r.label}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:${color}">${cp}</span>
+          </div>
+        </div>`;
+      }).join('')}
+      <div class="meta" style="font-size:11px;margin-bottom:12px">Toca cualquier celda para ver esos registros filtrados por antigüedad.</div>
+
       <div class="seccion-t">Por marca</div>
       <div class="chips">${MARCAS_CABEZA.map(m=>{
         const c = D.nucleos.filter(n=>marcaCoincide(n.marca,m)).length;
