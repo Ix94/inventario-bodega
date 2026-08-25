@@ -275,7 +275,7 @@ const UBIC_BASE = ['REC-01','TALLER ZAPOTAL','TRI-01','DSM-01','DSM-02','CMP-01'
 
 /* ── ROLES: 'admin' | 'supervisor' | 'operador' ── */
 const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador' };
-const ADMIN_ID = 'USR-ixel-flores';
+const ADMIN_ID = 'USR-ixel-flores';  // fallback mientras el campo rol esté en BD
 
 let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
@@ -390,10 +390,17 @@ const SUG = {
 /* =====================================================================
    UTILIDADES — rol
    ===================================================================== */
-const rolUsuario = () => USUARIO ? (USUARIO.rol || ROL.OP) : ROL.OP;
-const esAdmin    = () => rolUsuario() === ROL.ADMIN || (USUARIO && USUARIO.id === ADMIN_ID);
-const esSup      = () => esAdmin() || rolUsuario() === ROL.SUP;
-const puedeElim  = () => esSup();
+const rolUsuario = () => {
+  if(!USUARIO) return ROL.OP;
+  /* Prioridad 1: campo rol en base de datos (después del UPDATE en Supabase) */
+  if(USUARIO.rol) return USUARIO.rol;
+  /* Prioridad 2: fallback por ID para compatibilidad antes del UPDATE */
+  if(USUARIO.id === ADMIN_ID) return ROL.ADMIN;
+  return ROL.OP;
+};
+const esAdmin   = () => rolUsuario() === ROL.ADMIN;
+const esSup     = () => esAdmin() || rolUsuario() === ROL.SUP;
+const puedeElim = () => esSup();
 
 /* =====================================================================
    USUARIOS
@@ -409,7 +416,7 @@ function pedirUsuario(){
   caja.innerHTML = `<h2>¿Quién trabaja?</h2>
     <p>Todo lo que registres quedará firmado con tu nombre en la trazabilidad.</p>
     ${D.usuarios.map(u=>{
-      const r = u.id===ADMIN_ID?'admin':(u.rol||'operador');
+      const r = u.rol || (u.id===ADMIN_ID ? 'admin' : 'operador');
       const rc = r==='admin'?'rol-admin':r==='supervisor'?'rol-sup':'rol-op';
       const rl = r==='admin'?'ADMIN':r==='supervisor'?'SUPERVISOR':'OPERADOR';
       return `<button class="ubtn" onclick="entrar('${esc(u.id)}')">
