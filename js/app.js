@@ -987,8 +987,8 @@ function renderVista(){
         return c>0?`<span class="tag" style="margin:2px">${esc(u)} · ${c}</span>`:'';}).join('')}</div>
       <div class="seccion-t">Equipo</div>
       <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)} <b style="color:${u.rol==='admin'?'#C9900A':u.rol==='supervisor'?'#2B5A87':'#666'}">(${(u.rol||'OP').toUpperCase()})</b></span>`).join('')||'<span class="meta">Sin usuarios aún</span>'}</div>
-      <button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (CSV)</button>
-      <div class="meta" style="margin-top:8px">El archivo exportado se abre directamente en Excel y sirve de respaldo semanal.</div>`;
+      <button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (.xlsx)</button>
+      <div class="meta" style="margin-top:8px">Descarga un libro de Excel con una pestaña por tabla (Núcleos, Partes, Re-manufactura, Consignación, Movimientos) — sirve de respaldo semanal.</div>`;
   }
 }
 
@@ -1770,33 +1770,83 @@ function borrar(col, id){
 }
 
 /* =====================================================================
-   EXPORTAR CSV
+   EXPORTAR EXCEL (.xlsx) — un libro con una hoja por tabla
    ===================================================================== */
-const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')+'\n';
+
+/* Filas de la hoja "Consignación" para un ítem dado: el período activo
+   actual (si lo tiene) más cada período pasado guardado en consigHistorial.
+   Un ítem que nunca estuvo en consignación no aporta ninguna fila. */
+function filasConsig(item, esNucleo){
+  const filas = [];
+  const desc = esNucleo ? `${item.marca||''} ${item.modelo||''}`.trim() : (item.tipo||'');
+  const costoRemfg = esNucleo ? (item.precioRemfg||item.remfgDatos?.precio||'') : '';
+  const pct = esNucleo ? pctRemfg(costoRemfg, item.precio) : null;
+  const pctStr = pct!==null ? pct.toFixed(2)+'%' : '';
+  if(item.consig && item.consig.activo){
+    const vendido = esNucleo ? item.zona==='Vendido - Consignación' : item.venta==='Vendido';
+    filas.push([item.id, esNucleo?'NÚCLEO':'PARTE', desc, vendido?'VENDIDO EN CONSIGNACIÓN':'EN CONSIGNACIÓN',
+      item.consig.fechaEnvio||'', item.consig.semana||'', item.consig.notas||'', item.consig.resp||'',
+      item.consig.fechaVenta||'', '', '', item.precio||'', costoRemfg, pctStr]);
+  }
+  (item.consigHistorial||[]).forEach(h=>{
+    filas.push([item.id, esNucleo?'NÚCLEO':'PARTE', desc, 'DEVUELTO DE CONSIGNACIÓN',
+      h.fechaEnvio||'', h.semana||'', h.notas||'', h.resp||'',
+      h.fechaVenta||'', h.fechaRetiro||'', h.motivo||'', item.precio||'', costoRemfg, pctStr]);
+  });
+  return filas;
+}
+
 function exportar(){
-  let s = '\uFEFFNÚCLEOS\n';
-  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Precio Venta Est. (Lps)','Costo Re-Mfg (Lps)','% Costo Re-Mfg','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
+  const wb = XLSX.utils.book_new();
+
+  /* ── Núcleos ── */
+  const filasNucleos = [['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Precio Venta Est. (Lps)','Costo Re-Mfg (Lps)','% Costo Re-Mfg','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']];
   D.nucleos.forEach(n=>{ const mk=n.mack||{};
-    const costoRemfgCsv = n.precioRemfg||n.remfgDatos?.precio||'';
-    const pctCsv = pctRemfg(costoRemfgCsv, n.precio);
-    s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,n.precio||'',costoRemfgCsv,pctCsv!==null?pctCsv.toFixed(2)+'%':'',
+    const costoRemfg = n.precioRemfg||n.remfgDatos?.precio||'';
+    const pct = pctRemfg(costoRemfg, n.precio);
+    filasNucleos.push([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,n.precio||'',costoRemfg,pct!==null?pct.toFixed(2)+'%':'',
       ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
       mk.ratio||'',mk.thFlecha||'',mk.thCoplin||'',n.ubic,n.zona,enConsignacion(n)?'SÍ':'NO',n.consig?.fechaEnvio||'',n.consig?.semana||'',n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]);
   });
-  s+='\nPARTES\n';
-  s+=csvLinea(['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Coplín-TH','Coplín-Cruz','Coplín-Pista','Corona-Ratio','Modelos Compatibles','Ubicación','Fecha','Precio (Lps)','Estado','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasNucleos), 'Núcleos');
+
+  /* ── Partes ── */
+  const filasPartes = [['ID','Núcleo Origen','Tipo','Condición','Car1','Car2','Car3','Car4','Car5','Coplín-TH','Coplín-Cruz','Coplín-Pista','Corona-Ratio','Modelos Compatibles','Ubicación','Fecha','Precio (Lps)','Estado','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']];
   D.partes.forEach(p=>{ const cp=p.coplin||{}; const cr=p.corona||{};
-    s+=csvLinea([p.id,p.origen,p.tipo,p.cond,
+    filasPartes.push([p.id,p.origen,p.tipo,p.cond,
       ...(p.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
       cp.th||'',cp.cruz||'',cp.pista||'',cr.ratio||'',(p.modelos||[]).join('; '),
       p.ubic,p.fecha,p.precio,p.venta,enConsignacion(p)?'SÍ':'NO',p.consig?.fechaEnvio||'',p.consig?.semana||'',p.resp,(p.foto&&p.foto.startsWith('http'))?p.foto:'',p.notas]);
   });
-  s+='\nMOVIMIENTOS\n';
-  s+=csvLinea(['Fecha','ID/Ref','Origen','Destino','Motivo','Responsable']);
-  D.movs.forEach(m=>s+=csvLinea([m.fecha,m.ref,m.origen,m.destino,m.motivo,m.resp]));
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));
-  a.download=`inventario_bodega_${hoy()}.csv`; a.click();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasPartes), 'Partes');
+
+  /* ── Re-manufactura: todo núcleo que alguna vez pasó por el proceso ── */
+  const filasRemfg = [['ID','Marca','Modelo','Serie','Estado Actual','Fecha Ingreso Taller','Notas Ingreso','Fecha Diagnóstico','Fecha Entrega Repuestos','Fecha Completado','Costo Re-Mfg (Lps)','Notas Diagnóstico','Precio Venta Est. (Lps)','% Costo Re-Mfg','Vendido en Re-Mfg','Fecha Venta','Cliente','Precio Venta Real (Lps)','Notas Venta']];
+  D.nucleos
+    .filter(n=>n.remfgDatos||n.precioRemfg||n.ventaRemfg||n.zona==='Re-manufactura'||n.zona==='Vendido - Re-manufactura')
+    .forEach(n=>{
+      const d = n.remfgDatos||{};
+      const costo = n.precioRemfg||d.precio||'';
+      const pct = pctRemfg(costo, n.precio);
+      const vr = n.ventaRemfg||{};
+      const vendidoRemfg = n.zona==='Vendido - Re-manufactura' ? 'SÍ' : 'NO';
+      filasRemfg.push([n.id,n.marca,n.modelo,n.serie,n.zona,d.fechaIngreso||'',d.notasIngreso||'',d.fechaDiagnostico||'',d.fechaRepuestos||'',d.fechaCompletado||'',
+        costo,d.notasDiagnostico||'',n.precio||'',pct!==null?pct.toFixed(2)+'%':'',vendidoRemfg,vr.fecha||'',vr.cliente||'',vr.precio||'',vr.notas||'']);
+    });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasRemfg), 'Re-manufactura');
+
+  /* ── Consignación: período activo + historial de cada núcleo/parte ── */
+  const filasConsignacion = [['ID','Tipo','Descripción','Estado','Fecha Envío','Semana Envío','Notas Envío','Responsable Envío','Fecha Venta','Fecha Retiro','Motivo Retiro','Precio Venta Est. (Lps)','Costo Re-Mfg (Lps)','% Costo Re-Mfg']];
+  D.nucleos.forEach(n=>filasConsignacion.push(...filasConsig(n, true)));
+  D.partes.forEach(p=>filasConsignacion.push(...filasConsig(p, false)));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasConsignacion), 'Consignación');
+
+  /* ── Movimientos ── */
+  const filasMovs = [['Fecha','ID/Ref','Origen','Destino','Motivo','Responsable']];
+  D.movs.forEach(m=>filasMovs.push([m.fecha,m.ref,m.origen,m.destino,m.motivo,m.resp]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasMovs), 'Movimientos');
+
+  XLSX.writeFile(wb, `inventario_bodega_${hoy()}.xlsx`);
 }
 
 /* =====================================================================
