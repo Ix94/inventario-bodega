@@ -35,6 +35,19 @@ function enConsignacion(item){
   return item.consig && item.consig.activo;
 }
 
+/* ── % que representa el costo de re-manufactura sobre el precio de venta ──
+   < 40% verde · 40–65% amarillo · > 65% rojo */
+function pctRemfg(costo, precioVenta){
+  const c = Number(costo)||0, p = Number(precioVenta)||0;
+  if(!c || !p) return null;
+  return (c/p)*100;
+}
+function pctRemfgColor(pct){
+  if(pct>65) return '#7A1A12';   // rojo (mismo tono que edad-rojo)
+  if(pct>=40) return '#7A6000';  // amarillo/ámbar (mismo tono que edad-amarillo)
+  return '#1E6B35';              // verde (mismo tono que edad-verde)
+}
+
 let consVista = 'todo'; // 'todo' | 'semanas'
 
 
@@ -811,6 +824,8 @@ function renderVista(){
     function cardCons(item){
       const esNucleo = item._col==='nucleo';
       const vendido = esNucleo ? (item.zona==='Vendido - Consignación') : (item.venta==='Vendido');
+      const costoRemfg = esNucleo ? (item.precioRemfg||item.remfgDatos?.precio||0) : 0;
+      const pct = esNucleo ? pctRemfg(costoRemfg, item.precio) : null;
       return `<div class="card cons" style="${vendido?'opacity:.6':''}">
         <div class="top">
           <span><span class="id">${esc(item.id)}</span>${edadBadge(item.fecha)}</span>
@@ -822,7 +837,9 @@ function renderVista(){
             ? esc(item.tipo)+' · SERIE '+esc(item.serie||'—')
             : 'PARTE · '+esc(item.cond||'')}</div>
           <div class="meta">ENVIADO: ${esc(item.consig?.fechaEnvio||'—')} ${item.consig?.resp?'· 👤 '+esc(item.consig.resp):''}</div>
-          ${item.precio||item.precioRemfg?`<div class="meta">PRECIO: <b>L ${Number(item.precio||item.precioRemfg||0).toLocaleString()}</b></div>`:''}
+          ${item.precio?`<div class="meta">PRECIO VENTA EST.: <b>L ${Number(item.precio).toLocaleString()}</b></div>`:''}
+          ${costoRemfg?`<div class="meta">COSTO RE-MFG: <b>L ${Number(costoRemfg).toLocaleString()}</b></div>`:''}
+          ${pct!==null?`<div class="meta">% COSTO RE-MFG: <b style="color:${pctRemfgColor(pct)}">${pct.toFixed(2)}%</b></div>`:''}
         </div></div>
         ${chips(item.cars)}
         <div class="estado ${vendido?'scrap':'cons-est'}">● ${vendido?'VENDIDO EN CONSIGNACIÓN':'EN CONSIGNACIÓN'}</div>
@@ -842,9 +859,11 @@ function renderVista(){
     const vendidos = nucleosCons.filter(n=>n.zona==='Vendido - Consignación').length
                    + partesCons.filter(p=>p.venta==='Vendido').length;
 
-    /* Valor estimado pendiente de venta (no cuenta lo ya vendido) */
+    /* Valor estimado pendiente de venta (no cuenta lo ya vendido).
+       Usa solo el precio de venta estimado — el costo de re-manufactura
+       es un gasto, no debe sumarse como si fuera valor de venta. */
     const valorCons = nucleosCons.filter(n=>n.zona!=='Vendido - Consignación')
-                        .reduce((s,n)=>s+(Number(n.precio||n.precioRemfg)||0),0)
+                        .reduce((s,n)=>s+(Number(n.precio)||0),0)
                      + partesCons.filter(p=>p.venta!=='Vendido')
                         .reduce((s,p)=>s+(Number(p.precio)||0),0);
 
@@ -898,9 +917,10 @@ function renderVista(){
     const remfgCnt = D.nucleos.filter(n=>n.zona==='Re-manufactura').length;
     const dispo = D.partes.filter(p=>p.venta!=='Vendido').length;
     const valor = D.partes.filter(p=>p.venta!=='Vendido').reduce((s,p)=>s+(Number(p.precio)||0),0);
-    /* Valor estimado pendiente de venta en consignación (núcleos + partes, sin contar lo ya vendido) */
+    /* Valor estimado pendiente de venta en consignación (núcleos + partes, sin contar lo ya vendido).
+       Solo precio de venta — el costo de re-manufactura no es valor de venta. */
     const valorConsig = D.nucleos.filter(n=>enConsignacion(n) && n.zona!=='Vendido - Consignación')
-                           .reduce((s,n)=>s+(Number(n.precio||n.precioRemfg)||0),0)
+                           .reduce((s,n)=>s+(Number(n.precio)||0),0)
                        + D.partes.filter(p=>enConsignacion(p) && p.venta!=='Vendido')
                            .reduce((s,p)=>s+(Number(p.precio)||0),0);
 
@@ -1755,9 +1775,11 @@ function borrar(col, id){
 const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')+'\n';
 function exportar(){
   let s = '\uFEFFNÚCLEOS\n';
-  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Precio Est. (Lps)','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
+  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Precio Venta Est. (Lps)','Costo Re-Mfg (Lps)','% Costo Re-Mfg','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
   D.nucleos.forEach(n=>{ const mk=n.mack||{};
-    s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,n.precio||n.precioRemfg||'',
+    const costoRemfgCsv = n.precioRemfg||n.remfgDatos?.precio||'';
+    const pctCsv = pctRemfg(costoRemfgCsv, n.precio);
+    s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,n.precio||'',costoRemfgCsv,pctCsv!==null?pctCsv.toFixed(2)+'%':'',
       ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
       mk.ratio||'',mk.thFlecha||'',mk.thCoplin||'',n.ubic,n.zona,enConsignacion(n)?'SÍ':'NO',n.consig?.fechaEnvio||'',n.consig?.semana||'',n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]);
   });
