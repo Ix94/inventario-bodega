@@ -48,6 +48,23 @@ let F = {
   edad: ''       // ''|'<3m'|'3-6m'|'6-12m'|'>1a'
 };
 
+/* Ejecuta fn como mucho una vez cada `ms` tras la última llamada — evita
+   re-renderizar la lista completa en cada tecla mientras el usuario escribe. */
+function debounce(fn, ms){
+  let t;
+  return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
+}
+/* renderVista() se define más abajo; como es function declaration queda
+   disponible desde ya (hoisting). */
+const renderVistaDebounced = debounce(()=>renderVista(), 150);
+
+/* ── PAGINACIÓN de la pestaña Partes ──
+   Es la pestaña con más registros (creciendo hacia miles), así que la
+   lista se muestra por páginas en vez de renderizar todo de una vez. */
+const PARTES_POR_PAGINA = 150;
+let partesLimite = PARTES_POR_PAGINA;
+function cargarMasPartes(){ partesLimite += PARTES_POR_PAGINA; renderVista(); }
+
 /* ── ANTIGÜEDAD — helpers ── */
 const EDAD_RANGOS = [
   { key:'<3m',   label:'< 3 meses',  dias:[0,   89],  cls:'edad-verde'    },
@@ -600,9 +617,9 @@ function renderFiltros(){
           <button class="filtro-btn${F.parteTipo===t?' on':''}" onclick="setF('parteTipo','${esc(t)}')" style="font-size:11px">${t}</button>`).join('')}
       </div>
       <div class="fila-filtro" style="gap:4px">
-        <input placeholder="${esc(lbl1)}…" value="${esc(F.car1)}" oninput="setF('car1',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
-        <input placeholder="${esc(lbl2)}…" value="${esc(F.car2)}" oninput="setF('car2',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
-        <input placeholder="${esc(lbl3)}…" value="${esc(F.car3)}" oninput="setF('car3',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
+        <input placeholder="${esc(lbl1)}…" value="${esc(F.car1)}" oninput="setFTexto('car1',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
+        <input placeholder="${esc(lbl2)}…" value="${esc(F.car2)}" oninput="setFTexto('car2',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
+        <input placeholder="${esc(lbl3)}…" value="${esc(F.car3)}" oninput="setFTexto('car3',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
       </div>
       ${filaEdad()}`;
   } else {
@@ -612,10 +629,21 @@ function renderFiltros(){
 function setF(key, val){
   /* Toggle: si ya está seleccionado, deselecciona */
   F[key] = (F[key]===val) ? '' : val;
+  partesLimite = PARTES_POR_PAGINA;
   renderFiltros(); render();
+}
+/* Para los campos de texto libre (car1/car2/car3): NO reconstruye la barra
+   de filtros (eso destruiría el <input> mientras se escribe y le haría
+   perder el foco a cada letra) y espera una pausa antes de re-renderizar
+   la lista, para no recalcular todo en cada tecla con miles de partes. */
+function setFTexto(key, val){
+  F[key] = val;
+  partesLimite = PARTES_POR_PAGINA;
+  renderVistaDebounced();
 }
 function limpiarFiltros(){
   F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:'',edad:''};
+  partesLimite = PARTES_POR_PAGINA;
   renderFiltros(); render();
 }
 
@@ -630,6 +658,12 @@ const miniFoto = o => o.foto ? `<img class="foto-mini" src="${esc(o.foto)}" oncl
 
 function render(){
   renderFiltros();
+  renderVista();
+}
+/* Solo repinta la lista de la pestaña activa, sin tocar la barra de
+   filtros — así los inputs de texto (car1/car2/car3) no pierden el foco
+   mientras el usuario escribe. */
+function renderVista(){
   const v = $('#vista');
   const puedeAgregar = !SOLO_VER && (tab==='nucleos'||tab==='partes');
   $('#fab').style.display = puedeAgregar ? 'block':'none';
@@ -658,13 +692,14 @@ function render(){
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
           <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
           <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
+          ${n.precio?`<div class="meta">PRECIO EST.: <b>L ${Number(n.precio).toLocaleString()}</b></div>`:''}
         </div></div>
         ${chips(n.cars)}
         <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':esRemfg?'remfg-est':'dispo'}">● ${esc(n.zona||'Recibido')}</div>
         ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formNucleo('${n.id}')">✎ Editar</button>
           <button onclick="formMover('${n.id}')">Mover</button>
-          <button onclick="duplicarNucleo('${n.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
+          <button onclick="duplicarNucleo(this,'${n.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
           ${btnAccion}
           ${btnRemfg}
           ${btnElim}
@@ -678,7 +713,9 @@ function render(){
   }
 
   else if(tab==='partes'){
-    const lista = D.partes.filter(coincideParte);
+    const listaCompleta = D.partes.filter(coincideParte);
+    const lista = listaCompleta.slice(0, partesLimite);
+    const masPorCargar = listaCompleta.length - lista.length;
     v.innerHTML = avisoConfig + (lista.length ? lista.map(p=>`
       <div class="card parte">
         <div class="top">
@@ -697,12 +734,15 @@ function render(){
         ${SOLO_VER ? '' : `<div class="acciones">
           <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
-          <button onclick="duplicarParte('${p.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
+          <button onclick="duplicarParte(this,'${p.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
           <button class="warn" onclick="marcarVendido('${p.id}')">${p.venta==='Vendido'?'Disponible':'Vendido'}</button>
           ${!enConsignacion(p)?`<button class="cons" onclick="moverAConsig('parte','${p.id}')">🏪 Consig.</button>`:`<button class="cons" style="opacity:.5" onclick="quitarDeConsig('parte','${p.id}')">↩ Quitar consig.</button>`}
           ${puedeElim()?`<button class="peligro-sup" onclick="borrar('partes','${p.id}')">✕</button>`:''}
         </div>`}
-      </div>`).join('') :
+      </div>`).join('') + (masPorCargar>0?`
+      <button onclick="cargarMasPartes()" style="width:100%;margin-top:6px;padding:13px;background:#fff;border:1.5px dashed var(--naranja);color:var(--naranja);border-radius:10px;font-weight:600;cursor:pointer">
+        ↓ Cargar más (${lista.length} de ${listaCompleta.length})
+      </button>`:'') :
     `<div class="vacio"><b>Sin partes${(filtro||F.parteTipo||F.car1||F.car2||F.car3||F.edad)?' que coincidan':''}</b>
       ${F.edad?`<div style="margin:6px 0;font-size:13px">Filtro activo: antigüedad <b>${EDAD_RANGOS.find(r=>r.key===F.edad)?.label||F.edad}</b></div>`:''}
       ${(F.parteTipo||F.car1||F.car2||F.car3||F.edad)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--naranja);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Desarma un núcleo o toca + para registrar una parte suelta.'}
@@ -802,10 +842,20 @@ function render(){
     const vendidos = nucleosCons.filter(n=>n.zona==='Vendido - Consignación').length
                    + partesCons.filter(p=>p.venta==='Vendido').length;
 
+    /* Valor estimado pendiente de venta (no cuenta lo ya vendido) */
+    const valorCons = nucleosCons.filter(n=>n.zona!=='Vendido - Consignación')
+                        .reduce((s,n)=>s+(Number(n.precio||n.precioRemfg)||0),0)
+                     + partesCons.filter(p=>p.venta!=='Vendido')
+                        .reduce((s,p)=>s+(Number(p.precio)||0),0);
+
     v.innerHTML = `
       <div class="seccion-t" style="display:flex;justify-content:space-between;align-items:center">
         <span>🏪 Bodega de Consignación</span>
         <span style="font-size:12px;font-weight:400;color:#565B62">${total} ítems · ${vendidos} vendidos</span>
+      </div>
+      <div style="background:#E6F4EC;border:1.5px solid var(--verde-cons);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#0A5C2C;font-weight:600;font-size:13px">💰 Valor pendiente de venta en consignación</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:#0A5C2C">L ${valorCons.toLocaleString()}</span>
       </div>
       <!-- Sub-tabs: Todo | Por semana -->
       <div class="cons-tabs">
@@ -848,6 +898,11 @@ function render(){
     const remfgCnt = D.nucleos.filter(n=>n.zona==='Re-manufactura').length;
     const dispo = D.partes.filter(p=>p.venta!=='Vendido').length;
     const valor = D.partes.filter(p=>p.venta!=='Vendido').reduce((s,p)=>s+(Number(p.precio)||0),0);
+    /* Valor estimado pendiente de venta en consignación (núcleos + partes, sin contar lo ya vendido) */
+    const valorConsig = D.nucleos.filter(n=>enConsignacion(n) && n.zona!=='Vendido - Consignación')
+                           .reduce((s,n)=>s+(Number(n.precio||n.precioRemfg)||0),0)
+                       + D.partes.filter(p=>enConsignacion(p) && p.venta!=='Vendido')
+                           .reduce((s,p)=>s+(Number(p.precio)||0),0);
 
     /* Calcular distribución de antigüedad */
     const edadNucleos = EDAD_RANGOS.map(r=>({
@@ -870,6 +925,7 @@ function render(){
         <div class="kpi n2"><div class="num">L ${valor.toLocaleString()}</div><div class="lbl">Valor en partes</div></div>
         <div class="kpi n3"><div class="num">${remfgCnt}</div><div class="lbl">En re-manufactura</div></div>
         <div class="kpi" style="border-top-color:var(--verde-cons)"><div class="num">${D.nucleos.filter(n=>enConsignacion(n)).length + D.partes.filter(p=>enConsignacion(p)).length}</div><div class="lbl">En consignación</div></div>
+        <div class="kpi" style="border-top-color:var(--verde-cons)"><div class="num">L ${valorConsig.toLocaleString()}</div><div class="lbl">Valor en consignación</div></div>
       </div>
       ${(obsoletosN+obsoletosP)>0?`
       <div style="background:#FDECEA;border:1.5px solid #E08078;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:13px;color:#7A1A12">
@@ -1044,6 +1100,7 @@ function formNucleo(editId){
     <label>Fecha de ingreso</label>
     <input type="datetime-local" id="f-fecha" value="${ahoraLocal()}">
     <label>Estado visual</label><input id="f-estado" placeholder="CORROSIÓN LEVE, CARCASA ÍNTEGRA…">
+    <label>Precio estimado de venta (Lps)</label><input id="f-precio" type="number" inputmode="numeric" placeholder="0">
     ${bloqueMack()}
     ${camposCars(SUG['Transmisión'])}
     <label>Notas</label><textarea id="f-notas" rows="2"></textarea>
@@ -1059,6 +1116,7 @@ function formNucleo(editId){
     $('#f-marca').value = e.marca||''; $('#f-modelo').value = e.modelo||'';
     $('#f-posicion').value = e.posicion||''; $('#f-serie').value = e.serie||'';
     $('#f-ubic').value = e.ubic||''; $('#f-estado').value = e.estado||'';
+    $('#f-precio').value = e.precio||'';
     $('#f-notas').value = e.notas||'';
     if(e.fecha) $('#f-fecha').value = e.fecha.length===10 ? e.fecha+'T00:00' : e.fecha;
     [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value=''; $('#cv'+i).value=''; });
@@ -1106,7 +1164,7 @@ async function guardarNucleo(btn, editId){
     n.posicion=$('#f-posicion').value; n.serie=mayus($('#f-serie').value.trim());
     n.estado=mayus($('#f-estado').value.trim()); n.cars=leerCars();
     n.ubic=mayus($('#f-ubic').value.trim())||n.ubic; n.notas=mayus($('#f-notas').value.trim());
-    n.fecha=fechaGuardar;
+    n.precio=$('#f-precio').value; n.fecha=fechaGuardar;
     if(mack && Object.values(mack).some(v=>v)) n.mack=mack;
     await persistir('nucleo', n);
     if(n.ubic!==ubicAnt) mov(editId, ubicAnt, n.ubic, 'Cambio de ubicación (edición)', fechaGuardar);
@@ -1120,7 +1178,7 @@ async function guardarNucleo(btn, editId){
     id, tipo, fecha:fechaGuardar,
     marca:mayus($('#f-marca').value.trim()), modelo:mayus($('#f-modelo').value.trim()),
     posicion:$('#f-posicion').value, serie:mayus($('#f-serie').value.trim()),
-    estado:mayus($('#f-estado').value.trim()), cars:leerCars(), foto,
+    estado:mayus($('#f-estado').value.trim()), cars:leerCars(), foto, precio:$('#f-precio').value,
     ubic, zona:'Recibido', resp:USUARIO?USUARIO.nombre:'', notas:mayus($('#f-notas').value.trim())
   };
   if(mack && Object.values(mack).some(v=>v)) n.mack=mack;
@@ -1616,8 +1674,12 @@ function marcarVendido(id){
    (vuelve a estado inicial), foto (no se copia — fotos distintas),
    consig (la copia empieza sin consignación).
    ===================================================================== */
-async function duplicarNucleo(id){
-  const orig = D.nucleos.find(x=>x.id===id); if(!orig) return;
+async function duplicarNucleo(btn, id){
+  /* Protege contra doble-clic: sin esto, dos taps mientras espera la red
+     generaban dos duplicados. */
+  if(btn){ if(btn.disabled) return; btn.disabled=true; btn.textContent='Duplicando…'; }
+  const orig = D.nucleos.find(x=>x.id===id);
+  if(!orig){ if(btn){ btn.disabled=false; btn.textContent='⧉ Duplicar'; } return; }
   const nuevoId = await generarIdNucleo(orig.tipo);
   const copia = {
     ...JSON.parse(JSON.stringify(orig)),   // deep clone
@@ -1644,8 +1706,10 @@ async function duplicarNucleo(id){
   formNucleo(copia.id);
 }
 
-async function duplicarParte(id){
-  const orig = D.partes.find(x=>x.id===id); if(!orig) return;
+async function duplicarParte(btn, id){
+  if(btn){ if(btn.disabled) return; btn.disabled=true; btn.textContent='Duplicando…'; }
+  const orig = D.partes.find(x=>x.id===id);
+  if(!orig){ if(btn){ btn.disabled=false; btn.textContent='⧉ Duplicar'; } return; }
   const nuevoId = await generarIdParte();
   const copia = {
     ...JSON.parse(JSON.stringify(orig)),
@@ -1691,9 +1755,9 @@ function borrar(col, id){
 const csvLinea = arr => arr.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')+'\n';
 function exportar(){
   let s = '\uFEFFNÚCLEOS\n';
-  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
+  s += csvLinea(['ID','Tipo','Posición','Fecha','Marca','Modelo','Serie','Estado','Precio Est. (Lps)','Car1','Car2','Car3','Car4','Car5','MACK-Ratio','MACK-TH-Flecha','MACK-TH-Coplín','Ubicación','Zona','En Consignación','Fecha Envío Consig','Semana Consig','Responsable','Foto','Notas']);
   D.nucleos.forEach(n=>{ const mk=n.mack||{};
-    s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,
+    s+=csvLinea([n.id,n.tipo,n.posicion||'',n.fecha,n.marca,n.modelo,n.serie,n.estado,n.precio||n.precioRemfg||'',
       ...(n.cars||[]).map(c=>c.v?`${c.n}: ${c.v}`:'').concat(['','','','','']).slice(0,5),
       mk.ratio||'',mk.thFlecha||'',mk.thCoplin||'',n.ubic,n.zona,enConsignacion(n)?'SÍ':'NO',n.consig?.fechaEnvio||'',n.consig?.semana||'',n.resp,(n.foto&&n.foto.startsWith('http'))?n.foto:'',n.notas]);
   });
@@ -1719,7 +1783,7 @@ function exportar(){
 function marcarTab(){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
 document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{ tab=b.dataset.tab; limpiarFiltros(); marcarTab(); render(); });
 $('#fab').onclick = ()=> tab==='partes' ? formParte('') : formNucleo();
-$('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); render(); };
+$('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); partesLimite=PARTES_POR_PAGINA; renderVistaDebounced(); };
 $('#recargar').onclick = ()=> cargar();
 $('#hoja').onclick = e=>{ if(e.target.id==='hoja') cerrarHoja(); };
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && sb) cargar(false); });
