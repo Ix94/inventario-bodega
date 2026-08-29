@@ -61,6 +61,9 @@ let F = {
   edad: ''       // ''|'<3m'|'3-6m'|'6-12m'|'>1a'
 };
 
+/* ── ORDEN — aplica a las listas de todas las pestañas ── */
+let orden = { campo:'correlativo', dir:'desc' }; // campo: 'fecha'|'alfabetico'|'correlativo'
+
 /* Ejecuta fn como mucho una vez cada `ms` tras la última llamada — evita
    re-renderizar la lista completa en cada tecla mientras el usuario escribe. */
 function debounce(fn, ms){
@@ -134,6 +137,9 @@ const SOLO_VER = new URLSearchParams(location.search).has('ver');
 const $ = s => document.querySelector(s);
 const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const mayus = s => String(s??'').toUpperCase();
+/* Formato de moneda fijo (coma para miles, punto para decimales — 12,523.00)
+   sin depender del idioma configurado en el navegador de cada dispositivo. */
+const formatoMoneda = n => Number(n||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 /* Fecha/hora actual como string para datetime-local */
 const ahoraLocal = () => {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -551,6 +557,48 @@ function mov(id, origen, destino, motivo, fechaOverride){
 function coincideTexto(obj){
   return !filtro || JSON.stringify(obj).toUpperCase().includes(filtro);
 }
+
+/* ── ORDEN — helpers compartidos por todas las pestañas ── */
+/* Número correlativo de un id tipo PRT-0339 / TR-2026-08-0042 → el valor
+   crece con cada registro nuevo, así que sirve para "orden de captura". */
+function numeroCorrelativo(id){
+  return parseInt(String(id||'').replace(/[^0-9]/g,'').slice(-6)||'0', 10);
+}
+/* opts.fecha/alfa/correlativo son funciones que, dado un elemento de la
+   lista, devuelven el valor por el cual comparar en cada modo. */
+function ordenar(lista, opts){
+  const f = orden.dir==='asc' ? 1 : -1;
+  const copia = [...lista];
+  if(orden.campo==='fecha'){
+    copia.sort((a,b)=> f*String(opts.fecha(a)||'').localeCompare(String(opts.fecha(b)||'')));
+  } else if(orden.campo==='alfabetico'){
+    copia.sort((a,b)=> f*mayus(opts.alfa(a)||'').localeCompare(mayus(opts.alfa(b)||'')));
+  } else {
+    copia.sort((a,b)=> f*(opts.correlativo(a) - opts.correlativo(b)));
+  }
+  return copia;
+}
+function setOrden(campo){
+  if(orden.campo===campo){
+    orden.dir = orden.dir==='asc' ? 'desc' : 'asc';
+  } else {
+    orden.campo = campo;
+    orden.dir = campo==='alfabetico' ? 'asc' : 'desc';
+  }
+  renderFiltros(); render();
+}
+function botonOrden(campo, etiqueta){
+  const activo = orden.campo===campo;
+  return `<button class="filtro-btn${activo?' on':''}" onclick="setOrden('${campo}')">${etiqueta}${activo?(orden.dir==='asc'?' ↑':' ↓'):''}</button>`;
+}
+function barraOrden(){
+  return `<div class="fila-filtro">
+    <span class="filtro-label">Ordenar:</span>
+    ${botonOrden('fecha','Fecha de ingreso')}
+    ${botonOrden('alfabetico','Alfabético')}
+    ${botonOrden('correlativo','Correlativo')}
+  </div>`;
+}
 function marcaCoincide(marcaRegistro, filtroCabeza){
   if(!filtroCabeza) return true;
   const sub = MARCAS_MAPA[filtroCabeza] || [];
@@ -637,6 +685,7 @@ function renderFiltros(){
           <button class="filtro-btn${F.marca===m?' marca-on':''}" onclick="setF('marca','${m}')">${m}</button>`).join('')}
       </div>
       ${filaEdad()}
+      ${barraOrden()}
       ${barraLimpiar()}`;
   } else if(tab==='partes'){
     const tiposExistentes = [...new Set(D.partes.map(p=>mayus(p.tipo||'')).filter(Boolean))].slice(0,8);
@@ -656,9 +705,10 @@ function renderFiltros(){
         <input placeholder="${esc(lbl3)}…" value="${esc(F.car3)}" oninput="setFTexto('car3',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
       </div>
       ${filaEdad()}
+      ${barraOrden()}
       ${barraLimpiar()}`;
   } else if(tab==='remfg'||tab==='cons'||tab==='movs'){
-    wrap.innerHTML = barraLimpiar();
+    wrap.innerHTML = barraOrden() + barraLimpiar();
   } else {
     wrap.innerHTML = '';
   }
@@ -718,7 +768,9 @@ function renderVista(){
   const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo. Para compartir, configura Supabase en index.html.</div>` : '';
 
   if(tab==='nucleos'){
-    const lista = D.nucleos.filter(coincideNucleo);
+    const lista = ordenar(D.nucleos.filter(coincideNucleo), {
+      fecha:n=>n.fecha, alfa:n=>`${n.marca||''} ${n.modelo||''}`, correlativo:n=>numeroCorrelativo(n.id)
+    });
     v.innerHTML = avisoConfig + (lista.length ? lista.map(n=>{
       const esRemfg = n.zona==='Re-manufactura';
       const btnElim = puedeElim()
@@ -740,7 +792,7 @@ function renderVista(){
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
           <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
           <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
-          ${n.precio?`<div class="meta">PRECIO EST.: <b>L ${Number(n.precio).toLocaleString()}</b></div>`:''}
+          ${n.precio?`<div class="meta">PRECIO EST.: <b>L ${formatoMoneda(n.precio)}</b></div>`:''}
         </div></div>
         ${chips(n.cars)}
         <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':esRemfg?'remfg-est':'dispo'}">● ${esc(n.zona||'Recibido')}</div>
@@ -761,7 +813,9 @@ function renderVista(){
   }
 
   else if(tab==='partes'){
-    const listaCompleta = D.partes.filter(coincideParte);
+    const listaCompleta = ordenar(D.partes.filter(coincideParte), {
+      fecha:p=>p.fecha, alfa:p=>p.tipo, correlativo:p=>numeroCorrelativo(p.id)
+    });
     const lista = listaCompleta.slice(0, partesLimite);
     const masPorCargar = listaCompleta.length - lista.length;
     v.innerHTML = avisoConfig + (lista.length ? lista.map(p=>`
@@ -774,7 +828,7 @@ function renderVista(){
           <h3>${esc(p.tipo)}</h3>
           <div class="meta">ORIGEN: <b>${esc(p.origen||'—')}</b> · ${esc(p.cond||'')}</div>
           <div class="meta">${esc(p.fecha)} ${p.resp?'· 👤 '+esc(p.resp):''}</div>
-          ${p.precio?`<div class="meta">PRECIO: <b>L ${Number(p.precio).toLocaleString()}</b></div>`:''}
+          ${p.precio?`<div class="meta">PRECIO: <b>L ${formatoMoneda(p.precio)}</b></div>`:''}
           ${p.modelos&&p.modelos.length?`<div class="meta" style="font-size:11px">MODELOS: ${esc(p.modelos.join(', '))}</div>`:''}
         </div></div>
         ${chips(p.cars)}
@@ -798,7 +852,9 @@ function renderVista(){
   }
 
   else if(tab==='remfg'){
-    const lista = D.nucleos.filter(n=>n.zona==='Re-manufactura' && coincideTexto(n));
+    const lista = ordenar(D.nucleos.filter(n=>n.zona==='Re-manufactura' && coincideTexto(n)), {
+      fecha:n=>n.fecha, alfa:n=>`${n.marca||''} ${n.modelo||''}`, correlativo:n=>numeroCorrelativo(n.id)
+    });
     v.innerHTML = `<div class="seccion-t">\u{1F527} N\u00FAcleos en Re-manufactura</div>
       <div class="aviso-morado">Precio y fechas del proceso se editan desde cada n\u00FAcleo con "\u2702 Datos Re-Mfg".</div>` +
     (lista.length ? lista.map(n=>{
@@ -817,7 +873,7 @@ function renderVista(){
           <div class="meta">${esc(n.tipo)} \u00B7 SERIE ${esc(n.serie||'\u2014')}</div>
           <div class="meta">${esc(n.estado||'')} ${n.resp?'\u00B7 \u{1F464} '+esc(n.resp):''}</div>
           ${precio
-            ? `<div class="meta" style="color:var(--morado);font-weight:700">PRECIO RE-MFG: L ${Number(precio).toLocaleString()}</div>`
+            ? `<div class="meta" style="color:var(--morado);font-weight:700">PRECIO RE-MFG: L ${formatoMoneda(precio)}</div>`
             : `<div class="meta" style="color:#9B59D0;font-style:italic">\u26A0 Precio pendiente de diagn\u00F3stico</div>`}
           ${fechas.length
             ? `<div class="meta" style="font-size:12px;margin-top:4px;line-height:1.9">${fechas.join('<br>')}</div>`
@@ -845,10 +901,16 @@ function renderVista(){
     const partesCons  = D.partes.filter(p=>enConsignacion(p) && coincideTexto(p));
     const total = nucleosCons.length + partesCons.length;
 
-    /* Agrupar por semana de envío */
+    /* Combinar y ordenar una sola vez — la vista "Todo" y los grupos por
+       semana usan este mismo orden. */
+    const todosCons = ordenar(
+      [...nucleosCons.map(n=>({...n, _col:'nucleo'})), ...partesCons.map(p=>({...p, _col:'parte'}))],
+      { fecha:i=>i.consig?.fechaEnvio, alfa:i=>i._col==='nucleo'?`${i.marca||''} ${i.modelo||''}`:i.tipo, correlativo:i=>numeroCorrelativo(i.id) }
+    );
+
+    /* Agrupar por semana de envío (conservando el orden ya aplicado) */
     const porSemana = {};
-    [...nucleosCons.map(n=>({...n, _col:'nucleo'})),
-     ...partesCons.map(p=>({...p,  _col:'parte'}))].forEach(item=>{
+    todosCons.forEach(item=>{
       const sk = item.consig?.semana || semanaKey(item.consig?.fechaEnvio);
       if(!porSemana[sk]) porSemana[sk]=[];
       porSemana[sk].push(item);
@@ -872,8 +934,8 @@ function renderVista(){
             ? esc(item.tipo)+' · SERIE '+esc(item.serie||'—')
             : 'PARTE · '+esc(item.cond||'')}</div>
           <div class="meta">ENVIADO: ${esc(item.consig?.fechaEnvio||'—')} ${item.consig?.resp?'· 👤 '+esc(item.consig.resp):''}</div>
-          ${item.precio?`<div class="meta">PRECIO VENTA EST.: <b>L ${Number(item.precio).toLocaleString()}</b></div>`:''}
-          ${costoRemfg?`<div class="meta">COSTO RE-MFG: <b>L ${Number(costoRemfg).toLocaleString()}</b></div>`:''}
+          ${item.precio?`<div class="meta">PRECIO VENTA EST.: <b>L ${formatoMoneda(item.precio)}</b></div>`:''}
+          ${costoRemfg?`<div class="meta">COSTO RE-MFG: <b>L ${formatoMoneda(costoRemfg)}</b></div>`:''}
           ${pct!==null?`<div class="meta">% COSTO RE-MFG: <b style="color:${pctRemfgColor(pct)}">${pct.toFixed(2)}%</b></div>`:''}
         </div></div>
         ${chips(item.cars)}
@@ -909,7 +971,7 @@ function renderVista(){
       </div>
       <div style="background:#E6F4EC;border:1.5px solid var(--verde-cons);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
         <span style="color:#0A5C2C;font-weight:600;font-size:13px">💰 Valor pendiente de venta en consignación</span>
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:#0A5C2C">L ${valorCons.toLocaleString()}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:#0A5C2C">L ${formatoMoneda(valorCons)}</span>
       </div>
       <!-- Sub-tabs: Todo | Por semana -->
       <div class="cons-tabs">
@@ -919,10 +981,7 @@ function renderVista(){
       ${total===0 ? avisoVacio :
         consVista==='todo'
         ? /* ── vista plana ── */
-          [...nucleosCons.map(n=>({...n,_col:'nucleo'})),
-           ...partesCons.map(p=>({...p,_col:'parte'}))]
-          .sort((a,b)=>(b.consig?.fechaEnvio||'').localeCompare(a.consig?.fechaEnvio||''))
-          .map(cardCons).join('')
+          todosCons.map(cardCons).join('')
         : /* ── vista por semana ── */
           semanas.map(sk=>{
             const items = porSemana[sk];
@@ -937,7 +996,12 @@ function renderVista(){
   }
 
   else if(tab==='movs'){
-    const lista = D.movs.filter(m=>!filtro||JSON.stringify(m).toUpperCase().includes(filtro));
+    /* Los IDs de movimiento (MOV-<timestamp>-<random>) no sirven para
+       "correlativo" por dígitos — se usa la marca de tiempo real (ts). */
+    const lista = ordenar(
+      D.movs.filter(m=>!filtro||JSON.stringify(m).toUpperCase().includes(filtro)),
+      { fecha:m=>m.fecha, alfa:m=>m.motivo, correlativo:m=>new Date(m.ts||m.fecha).getTime()||0 }
+    );
     v.innerHTML = `<div class="seccion-t">Historial de movimientos</div>` +
     (lista.length ? lista.map(m=>`
       <div class="mov"><div class="f">${esc(m.fecha)} · ${esc(m.resp||'')}</div>
@@ -959,6 +1023,15 @@ function renderVista(){
                        + D.partes.filter(p=>enConsignacion(p) && p.venta!=='Vendido')
                            .reduce((s,p)=>s+(Number(p.precio)||0),0);
 
+    /* Total vendido por la bodega: partes vendidas + núcleos vendidos
+       (ya sea directo de re-manufactura o desde consignación). */
+    const totalVendido = D.partes.filter(p=>p.venta==='Vendido')
+                            .reduce((s,p)=>s+(Number(p.precio)||0),0)
+                        + D.nucleos.filter(n=>n.zona==='Vendido - Re-manufactura')
+                            .reduce((s,n)=>s+(Number(n.ventaRemfg?.precio)||0),0)
+                        + D.nucleos.filter(n=>n.zona==='Vendido - Consignación')
+                            .reduce((s,n)=>s+(Number(n.precio)||0),0);
+
     /* Calcular distribución de antigüedad */
     const edadNucleos = EDAD_RANGOS.map(r=>({
       ...r,
@@ -977,10 +1050,11 @@ function renderVista(){
         <div class="kpi"><div class="num">${nd}</div><div class="lbl">Núcleos totales</div></div>
         <div class="kpi"><div class="num">${tr} / ${df}</div><div class="lbl">Transm. / Difer.</div></div>
         <div class="kpi n2"><div class="num">${dispo}</div><div class="lbl">Partes disponibles</div></div>
-        <div class="kpi n2"><div class="num">L ${valor.toLocaleString()}</div><div class="lbl">Valor en partes</div></div>
+        <div class="kpi n2"><div class="num">L ${formatoMoneda(valor)}</div><div class="lbl">Valor en partes</div></div>
+        <div class="kpi" style="border-top-color:var(--ok)"><div class="num">L ${formatoMoneda(totalVendido)}</div><div class="lbl">Total vendido</div></div>
         <div class="kpi n3"><div class="num">${remfgCnt}</div><div class="lbl">En re-manufactura</div></div>
         <div class="kpi" style="border-top-color:var(--verde-cons)"><div class="num">${D.nucleos.filter(n=>enConsignacion(n)).length + D.partes.filter(p=>enConsignacion(p)).length}</div><div class="lbl">En consignación</div></div>
-        <div class="kpi" style="border-top-color:var(--verde-cons)"><div class="num">L ${valorConsig.toLocaleString()}</div><div class="lbl">Valor en consignación</div></div>
+        <div class="kpi" style="border-top-color:var(--verde-cons)"><div class="num">L ${formatoMoneda(valorConsig)}</div><div class="lbl">Valor en consignación</div></div>
       </div>
       ${(obsoletosN+obsoletosP)>0?`
       <div style="background:#FDECEA;border:1.5px solid #E08078;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:13px;color:#7A1A12">
@@ -1413,7 +1487,7 @@ async function confirmarVentaRemfg(id){
   await persistir('nucleo', n);
   mov(id, n.ubic, 'VENTA RE-MFG', `VENDIDO A ${cliente} - L ${precio}`, fecha);
   cerrarHoja(); render();
-  alert(`✓ Venta registrada.\nNúcleo ${id} vendido a ${cliente} por L ${Number(precio).toLocaleString()}`);
+  alert(`✓ Venta registrada.\nNúcleo ${id} vendido a ${cliente} por L ${formatoMoneda(precio)}`);
 }
 
 /* =====================================================================
