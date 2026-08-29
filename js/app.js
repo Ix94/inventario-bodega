@@ -678,11 +678,20 @@ function setFTexto(key, val){
   partesLimite = PARTES_POR_PAGINA;
   renderVistaDebounced();
 }
-function limpiarFiltros(){
+/* Solo los filtros de botones/campos propios de cada pestaña (tipo,
+   marca, car1-3, edad, etc). NO toca el buscador de texto de arriba —
+   se usa al cambiar de pestaña, para poder buscar "10X37" en
+   Diferenciales, no encontrarlo, y pasar a Partes con la misma
+   búsqueda ya aplicada en vez de tener que volver a escribirla. */
+function limpiarFiltrosEstructurados(){
   F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:'',edad:''};
+  partesLimite = PARTES_POR_PAGINA;
+}
+/* Limpia todo, incluido el buscador de texto — la del botón "✕ Limpiar filtros". */
+function limpiarFiltros(){
+  limpiarFiltrosEstructurados();
   filtro = '';
   const buscador = $('#search'); if(buscador) buscador.value = '';
-  partesLimite = PARTES_POR_PAGINA;
   renderFiltros(); render();
 }
 
@@ -1886,7 +1895,7 @@ function exportar(){
    NAVEGACIÓN
    ===================================================================== */
 function marcarTab(){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
-document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{ tab=b.dataset.tab; limpiarFiltros(); marcarTab(); render(); });
+document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{ tab=b.dataset.tab; limpiarFiltrosEstructurados(); marcarTab(); render(); });
 $('#fab').onclick = ()=> tab==='partes' ? formParte('') : formNucleo();
 $('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); partesLimite=PARTES_POR_PAGINA; renderTrasBusquedaDebounced(); };
 $('#recargar').onclick = ()=> cargar();
