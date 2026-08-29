@@ -70,6 +70,11 @@ function debounce(fn, ms){
 /* renderVista() se define más abajo; como es function declaration queda
    disponible desde ya (hoisting). */
 const renderVistaDebounced = debounce(()=>renderVista(), 150);
+/* Igual, pero también repinta la barra de filtros (para que el botón
+   "Limpiar filtros" aparezca/desaparezca al escribir en el buscador
+   principal, que vive fuera de #filtros-wrap y no le pasa nada al
+   reconstruirla). */
+const renderTrasBusquedaDebounced = debounce(()=>{ renderFiltros(); renderVista(); }, 150);
 
 /* ── PAGINACIÓN de la pestaña Partes ──
    Es la pestaña con más registros (creciendo hacia miles), así que la
@@ -149,7 +154,7 @@ const SUG = {
   'Engrane':       ['N° DE DIENTES','DIÁMETRO','ESPESOR','ESTRÍAS INTERNAS','POSICIÓN (1RA, 2DA…)'],
   'Portadiferencial':['RELACIÓN','MARCA','MODELO','ESTRÍAS PIÑÓN','ESTADO DE CORONAS'],
   'Rodamiento':    ['N° DE REFERENCIA','DIÁMETRO INTERNO','DIÁMETRO EXTERNO','ESPESOR','MARCA'],
-  _def:['CARACTERÍSTICA 1','CARACTERÍSTICA 2','CARACTERÍSTICA 3','CARACTERÍSTICA 4','CARACTERÍSTICA 5']
+  _def:['# PARTE','CARACTERÍSTICA 2','CARACTERÍSTICA 3','CARACTERÍSTICA 4','CARACTERÍSTICA 5']
 };
 
 /* =====================================================================
@@ -541,6 +546,11 @@ function mov(id, origen, destino, motivo, fechaOverride){
 /* =====================================================================
    FILTROS — lógica de filtrado
    ===================================================================== */
+/* Buscador de texto libre (arriba, #search) — reutilizable en cualquier
+   pestaña, no solo Núcleos/Partes. */
+function coincideTexto(obj){
+  return !filtro || JSON.stringify(obj).toUpperCase().includes(filtro);
+}
 function marcaCoincide(marcaRegistro, filtroCabeza){
   if(!filtroCabeza) return true;
   const sub = MARCAS_MAPA[filtroCabeza] || [];
@@ -596,6 +606,16 @@ function filaEdad(){
   </div>`;
 }
 
+/* Botón visible en cuanto haya algún filtro activo (búsqueda de texto o
+   cualquiera de los F.*), en cualquier pestaña que filtre — incluidas
+   Re-Mfg, Consig. y Movim., que solo usan el buscador de texto. */
+function barraLimpiar(){
+  const hayFiltro = filtro || F.tipo || F.posicion || F.marca || F.parteTipo || F.car1 || F.car2 || F.car3 || F.edad;
+  if(!hayFiltro) return '';
+  return `<div class="fila-filtro" style="justify-content:flex-end">
+    <button class="filtro-btn" onclick="limpiarFiltros()" style="border-color:var(--naranja);color:var(--naranja)">✕ Limpiar filtros</button>
+  </div>`;
+}
 function renderFiltros(){
   const wrap = $('#filtros-wrap');
   if(tab==='nucleos'){
@@ -616,7 +636,8 @@ function renderFiltros(){
         ${MARCAS_CABEZA.map(m=>`
           <button class="filtro-btn${F.marca===m?' marca-on':''}" onclick="setF('marca','${m}')">${m}</button>`).join('')}
       </div>
-      ${filaEdad()}`;
+      ${filaEdad()}
+      ${barraLimpiar()}`;
   } else if(tab==='partes'){
     const tiposExistentes = [...new Set(D.partes.map(p=>mayus(p.tipo||'')).filter(Boolean))].slice(0,8);
     const ejCars = D.partes[0]?.cars||[];
@@ -634,7 +655,10 @@ function renderFiltros(){
         <input placeholder="${esc(lbl2)}…" value="${esc(F.car2)}" oninput="setFTexto('car2',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
         <input placeholder="${esc(lbl3)}…" value="${esc(F.car3)}" oninput="setFTexto('car3',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
       </div>
-      ${filaEdad()}`;
+      ${filaEdad()}
+      ${barraLimpiar()}`;
+  } else if(tab==='remfg'||tab==='cons'||tab==='movs'){
+    wrap.innerHTML = barraLimpiar();
   } else {
     wrap.innerHTML = '';
   }
@@ -656,6 +680,8 @@ function setFTexto(key, val){
 }
 function limpiarFiltros(){
   F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:'',edad:''};
+  filtro = '';
+  const buscador = $('#search'); if(buscador) buscador.value = '';
   partesLimite = PARTES_POR_PAGINA;
   renderFiltros(); render();
 }
@@ -763,7 +789,7 @@ function renderVista(){
   }
 
   else if(tab==='remfg'){
-    const lista = D.nucleos.filter(n=>n.zona==='Re-manufactura');
+    const lista = D.nucleos.filter(n=>n.zona==='Re-manufactura' && coincideTexto(n));
     v.innerHTML = `<div class="seccion-t">\u{1F527} N\u00FAcleos en Re-manufactura</div>
       <div class="aviso-morado">Precio y fechas del proceso se editan desde cada n\u00FAcleo con "\u2702 Datos Re-Mfg".</div>` +
     (lista.length ? lista.map(n=>{
@@ -806,8 +832,8 @@ function renderVista(){
 
   else if(tab==='cons'){
     /* ── Recolectar todo lo que está en consignación ── */
-    const nucleosCons = D.nucleos.filter(n=>enConsignacion(n));
-    const partesCons  = D.partes.filter(p=>enConsignacion(p));
+    const nucleosCons = D.nucleos.filter(n=>enConsignacion(n) && coincideTexto(n));
+    const partesCons  = D.partes.filter(p=>enConsignacion(p) && coincideTexto(p));
     const total = nucleosCons.length + partesCons.length;
 
     /* Agrupar por semana de envío */
@@ -1007,9 +1033,15 @@ function camposCars(nombres){
     </div>`).join('')}</div>`;
 }
 const leerCars = () => [0,1,2,3,4].map(i=>({n:mayus($('#cn'+i).value.trim()), v:mayus($('#cv'+i).value.trim())}));
-function ponSug(t){
+/* soloVacios=true: no pisa un nombre de característica que ya tenga
+   valor (usado al editar una parte existente, para no perder nombres
+   personalizados ya guardados como "# TAPA DE CILINDRO"). */
+function ponSug(t, soloVacios){
   const s = SUG[t]||SUG._def;
-  [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value = s[i]||''; });
+  [0,1,2,3,4].forEach(i=>{
+    const el = $('#cn'+i);
+    if(!soloVacios || !el.value) el.value = s[i]||'';
+  });
   /* bloque-mack solo existe en formulario de núcleo — onMarcaCambio() lo maneja */
 }
 
@@ -1403,7 +1435,7 @@ function formParte(origen){
     <label>Notas</label><textarea id="p-notas" rows="2"></textarea>
     <button class="guardar" onclick="guardarParte(this,'${origen||''}')">Guardar parte</button>`);
 }
-function onTipoParte(val){
+function onTipoParte(val, soloVacios){
   /* Mapear el tipo escrito al key de SUG correspondiente */
   const t = mayus(val.trim());
   const keyMap = {
@@ -1417,7 +1449,7 @@ function onTipoParte(val){
     'DIFERENCIAL':'Diferencial'
   };
   const sugKey = keyMap[t] || val;
-  ponSug(sugKey);
+  ponSug(sugKey, soloVacios);
 }
 async function guardarParte(btn, origen){
   btn.disabled=true; btn.textContent='Guardando…';
@@ -1471,8 +1503,9 @@ function formEditarParte(id){
   (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value=c.n||''; $('#cv'+i).value=c.v||''; });
   if(e.foto){ const p=$('#foto-prev'); p.src=e.foto; p.style.display='block'; $('#fotobtn-txt').textContent='✓ Ya tiene foto'; }
 
-  /* Precargar sugerencias de características según el tipo */
-  onTipoParte(e.tipo||'');
+  /* Sugerir nombres de característica SOLO en los campos vacíos —
+     nunca pisar un nombre que la parte ya tenía guardado. */
+  onTipoParte(e.tipo||'', true);
 }
 async function guardarEdicionParte(btn, id){
   btn.disabled=true; btn.textContent='Guardando…';
@@ -1855,7 +1888,7 @@ function exportar(){
 function marcarTab(){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
 document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{ tab=b.dataset.tab; limpiarFiltros(); marcarTab(); render(); });
 $('#fab').onclick = ()=> tab==='partes' ? formParte('') : formNucleo();
-$('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); partesLimite=PARTES_POR_PAGINA; renderVistaDebounced(); };
+$('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); partesLimite=PARTES_POR_PAGINA; renderTrasBusquedaDebounced(); };
 $('#recargar').onclick = ()=> cargar();
 $('#hoja').onclick = e=>{ if(e.target.id==='hoja') cerrarHoja(); };
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && sb) cargar(false); });
