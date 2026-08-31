@@ -763,6 +763,9 @@ function render(){
    mientras el usuario escribe. */
 function renderVista(){
   const v = $('#vista');
+  /* Habilita el layout de columnas para PC solo en las pestañas que son
+     listas de tarjetas — ver css/styles.css @media (min-width:900px). */
+  v.classList.toggle('vista-cards', tab==='nucleos'||tab==='partes'||tab==='remfg'||tab==='cons');
   const puedeAgregar = !SOLO_VER && (tab==='nucleos'||tab==='partes');
   $('#fab').style.display = puedeAgregar ? 'block':'none';
   const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo. Para compartir, configura Supabase en index.html.</div>` : '';
@@ -969,7 +972,7 @@ function renderVista(){
         <span>🏪 Bodega de Consignación</span>
         <span style="font-size:12px;font-weight:400;color:#565B62">${total} ítems · ${vendidos} vendidos</span>
       </div>
-      <div style="background:#E6F4EC;border:1.5px solid var(--verde-cons);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <div class="cons-resumen" style="background:#E6F4EC;border:1.5px solid var(--verde-cons);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
         <span style="color:#0A5C2C;font-weight:600;font-size:13px">💰 Valor pendiente de venta en consignación</span>
         <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:#0A5C2C">L ${formatoMoneda(valorCons)}</span>
       </div>
