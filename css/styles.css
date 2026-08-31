@@ -195,3 +195,34 @@
     letter-spacing:.05em;text-transform:uppercase;border-radius:8px;cursor:pointer;color:#565B62;transition:all .15s}
   .cons-tab.on{background:var(--verde-cons);color:#fff}
   .acciones button.cons{border-color:var(--verde-cons);color:var(--verde-cons)}
+
+  /* ── VISTA DE ESCRITORIO ──
+     Todo lo de arriba es "mobile-first" y queda intacto: estas reglas solo
+     entran a partir de min-width:900px, así que en un teléfono no cambia
+     absolutamente nada. En pantallas anchas se aprovecha el espacio: el
+     contenedor crece y las tarjetas (Núcleos/Partes/Re-Mfg/Consig.) se
+     acomodan en columnas en vez de una sola lista angosta y larga. */
+  @media (min-width:900px){
+    #app{max-width:1400px}
+    nav{max-width:1400px}
+    #fab{right:max(16px, calc((100vw - 1400px)/2 + 16px))}
+
+    #vista.vista-cards{column-count:2; column-gap:16px}
+    #vista.vista-cards > .card{break-inside:avoid; margin-bottom:14px}
+    /* Los bloques que no son tarjetas (avisos, títulos de sección,
+       tabs, resumen de consignación, tarjeta vacía) ocupan todo el ancho
+       en vez de quedar apretados en una sola columna. */
+    #vista.vista-cards > .aviso,
+    #vista.vista-cards > .aviso-morado,
+    #vista.vista-cards > .vacio,
+    #vista.vista-cards > .seccion-t,
+    #vista.vista-cards > .cons-tabs,
+    #vista.vista-cards > .cons-resumen,
+    #vista.vista-cards > .semana-header,
+    #vista.vista-cards > button{
+      column-span:all;
+    }
+  }
+  @media (min-width:1300px){
+    #vista.vista-cards{column-count:3}
+  }
