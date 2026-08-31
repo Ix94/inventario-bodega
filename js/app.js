@@ -1017,8 +1017,17 @@ function renderVista(){
     const tr = D.nucleos.filter(n=>n.tipo==='Transmisión').length;
     const df = nd - tr;
     const remfgCnt = D.nucleos.filter(n=>n.zona==='Re-manufactura').length;
-    const dispo = D.partes.filter(p=>p.venta!=='Vendido').length;
-    const valor = D.partes.filter(p=>p.venta!=='Vendido').reduce((s,p)=>s+(Number(p.precio)||0),0);
+
+    /* "Disponible" = no vendido. Se reutiliza para el KPI y para que la
+       antigüedad no cuente lo que ya se vendió (un núcleo/parte vendido
+       hace tiempo no es inventario "viejo" pendiente de rotar). */
+    const nucleosVendidosZonas = ['Vendido - Re-manufactura','Vendido - Consignación'];
+    const nucleosDisponiblesArr = D.nucleos.filter(n=>!nucleosVendidosZonas.includes(n.zona));
+    const nucleosVendidosCount = nd - nucleosDisponiblesArr.length;
+    const partesDisponiblesArr = D.partes.filter(p=>p.venta!=='Vendido');
+    const dispo = partesDisponiblesArr.length;
+    const partesVendidasCount = D.partes.length - dispo;
+    const valor = partesDisponiblesArr.reduce((s,p)=>s+(Number(p.precio)||0),0);
     /* Valor estimado pendiente de venta en consignación (núcleos + partes, sin contar lo ya vendido).
        Solo precio de venta — el costo de re-manufactura no es valor de venta. */
     const valorConsig = D.nucleos.filter(n=>enConsignacion(n) && n.zona!=='Vendido - Consignación')
@@ -1035,14 +1044,15 @@ function renderVista(){
                         + D.nucleos.filter(n=>n.zona==='Vendido - Consignación')
                             .reduce((s,n)=>s+(Number(n.precio)||0),0);
 
-    /* Calcular distribución de antigüedad */
+    /* Calcular distribución de antigüedad — solo de lo disponible, no de
+       lo ya vendido */
     const edadNucleos = EDAD_RANGOS.map(r=>({
       ...r,
-      cnt: D.nucleos.filter(n=>{ const d=diasDesde(n.fecha); return d>=r.dias[0]&&d<=r.dias[1]; }).length
+      cnt: nucleosDisponiblesArr.filter(n=>{ const d=diasDesde(n.fecha); return d>=r.dias[0]&&d<=r.dias[1]; }).length
     }));
     const edadPartes = EDAD_RANGOS.map(r=>({
       ...r,
-      cnt: D.partes.filter(p=>{ const d=diasDesde(p.fecha); return d>=r.dias[0]&&d<=r.dias[1]; }).length
+      cnt: partesDisponiblesArr.filter(p=>{ const d=diasDesde(p.fecha); return d>=r.dias[0]&&d<=r.dias[1]; }).length
     }));
     /* Items con > 1 año que siguen disponibles = candidatos a limpiar */
     const obsoletosN = edadNucleos.find(r=>r.key==='>1a')?.cnt||0;
@@ -1050,9 +1060,9 @@ function renderVista(){
 
     v.innerHTML = `
       <div class="kpis">
-        <div class="kpi"><div class="num">${nd}</div><div class="lbl">Núcleos totales</div></div>
+        <div class="kpi"><div class="num">${nd}<span style="font-size:15px;color:#8A8F96;font-weight:600">/${nucleosVendidosCount} vendidos</span></div><div class="lbl">Núcleos totales</div></div>
         <div class="kpi"><div class="num">${tr} / ${df}</div><div class="lbl">Transm. / Difer.</div></div>
-        <div class="kpi n2"><div class="num">${dispo}</div><div class="lbl">Partes disponibles</div></div>
+        <div class="kpi n2"><div class="num">${dispo}<span style="font-size:15px;color:#8A8F96;font-weight:600">/${partesVendidasCount} vendidas</span></div><div class="lbl">Partes disponibles</div></div>
         <div class="kpi n2"><div class="num">L ${formatoMoneda(valor)}</div><div class="lbl">Valor en partes</div></div>
         <div class="kpi" style="border-top-color:var(--ok)"><div class="num">L ${formatoMoneda(totalVendido)}</div><div class="lbl">Total vendido</div></div>
         <div class="kpi n3"><div class="num">${remfgCnt}</div><div class="lbl">En re-manufactura</div></div>
