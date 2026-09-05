@@ -12,7 +12,7 @@ const UBIC_BASE = ['REC-01','TALLER ZAPOTAL','TRI-01','DSM-01','DSM-02','CMP-01'
 const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador' };
 const ADMIN_ID = 'USR-ixel-flores';  // fallback mientras el campo rol esté en BD
 
-let D = { nucleos:[], partes:[], movs:[], usuarios:[] };
+let D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
 let confirmCallback = null;
 
@@ -46,6 +46,38 @@ function pctRemfgColor(pct){
   if(pct>65) return '#7A1A12';   // rojo (mismo tono que edad-rojo)
   if(pct>=40) return '#7A6000';  // amarillo/ámbar (mismo tono que edad-amarillo)
   return '#1E6B35';              // verde (mismo tono que edad-verde)
+}
+
+/* ── CATEGORÍA ABC (semáforo) ──
+   Clave por la que se agrupan y categorizan los artículos:
+   - Núcleos: por marca + modelo.
+   - Partes: por el valor de la característica cuyo NOMBRE empieza con
+     "#" (el "# parte" / "# tapa de cilindro" / etc. que ya usa la app
+     como número de parte). Si no tiene ninguna así (p. ej. Coplín y
+     Corona-Piñón, que usan Ratio/N° Corona en vez de "# algo"), se
+     agrupan por tipo de pieza completo. */
+function claveCategoria(item, esNucleo){
+  if(esNucleo) return 'N:' + mayus(`${item.marca||''} ${item.modelo||''}`.trim());
+  const conCodigo = (item.cars||[]).find(c=>c.n && mayus(c.n).trim().startsWith('#') && c.v);
+  const base = conCodigo ? conCodigo.v : (item.tipo||'SIN TIPO');
+  return 'P:' + mayus(String(base).trim());
+}
+function mapaCategorias(){
+  return new Map(D.categorias.map(c=>[c.id, c.categoria]));
+}
+async function guardarCategoria(clave, letra){
+  if(!esSup()) return;
+  const actual = D.categorias.find(c=>c.id===clave);
+  const cat = { id:clave, categoria:letra, actualizadoPor:USUARIO?USUARIO.nombre:'', fecha:hoy() };
+  if(actual) Object.assign(actual, cat); else D.categorias.push(cat);
+  await persistir('categoria', cat);
+  render();
+}
+function badgeCategoria(clave, mapa){
+  const cat = mapa.get(clave);
+  if(!cat) return '';
+  const claseColor = cat==='A'?'cat-a':cat==='B'?'cat-b':'cat-c';
+  return `<span class="cat-badge ${claseColor}" title="Categoría ${cat}">${cat}</span>`;
 }
 
 let consVista = 'todo'; // 'todo' | 'semanas'
@@ -185,6 +217,8 @@ function sesion(){ try{ return JSON.parse(localStorage.getItem(SESION)); }catch(
 function pintarUsuario(){
   const lbl = SOLO_VER ? '👁 SOLO LECTURA' : ('👤 ' + (USUARIO ? USUARIO.nombre.toUpperCase() : '—'));
   $('#usuario-chip').textContent = lbl;
+  const navCat = $('#nav-categorias');
+  if(navCat) navCat.style.display = esSup() ? '' : 'none';
 }
 function pedirUsuario(){
   if(SOLO_VER) return;
@@ -326,12 +360,13 @@ async function cargar(mostrar=true){
       desde += BLOQUE;
     }
 
-    D = { nucleos:[], partes:[], movs:[], usuarios:[] };
+    D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[] };
     for(const fila of todas){
       if(fila.col==='nucleo')        D.nucleos.push(fila.data);
       else if(fila.col==='parte')    D.partes.push(fila.data);
       else if(fila.col==='mov')      D.movs.push(fila.data);
       else if(fila.col==='usuario')  D.usuarios.push(fila.data);
+      else if(fila.col==='categoria') D.categorias.push(fila.data);
     }
     /* Ordenar partes/núcleos de más nuevo a más viejo numéricamente */
     const numId = id => parseInt((id||'').replace(/[^0-9]/g,'').slice(-6)||'0', 10);
@@ -762,12 +797,16 @@ function render(){
    filtros — así los inputs de texto (car1/car2/car3) no pierden el foco
    mientras el usuario escribe. */
 function renderVista(){
+  /* Si cambia de usuario en el mismo dispositivo y el que entra no es
+     supervisor/admin, sacarlo de la pestaña de Categorías. */
+  if(tab==='categorias' && !esSup()){ tab='nucleos'; marcarTab(); }
   const v = $('#vista');
   /* Habilita el layout de columnas para PC solo en las pestañas que son
      listas de tarjetas — ver css/styles.css @media (min-width:900px). */
   v.classList.toggle('vista-cards', tab==='nucleos'||tab==='partes'||tab==='remfg'||tab==='cons');
   const puedeAgregar = !SOLO_VER && (tab==='nucleos'||tab==='partes');
   $('#fab').style.display = puedeAgregar ? 'block':'none';
+  const mapaCat = mapaCategorias();
   const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo. Para compartir, configura Supabase en index.html.</div>` : '';
 
   if(tab==='nucleos'){
@@ -788,14 +827,14 @@ function renderVista(){
         ? `<button class="morado" onclick="enviarARemfg('${n.id}')">🔧 Re-manufactura</button>` : '';
       return `<div class="card${esRemfg?' remfg':''}">
         <div class="top">
-          <span><span class="id">${esc(n.id)}</span>${edadBadge(n.fecha)}</span>
+          <span><span class="id">${esc(n.id)}</span>${edadBadge(n.fecha)}${badgeCategoria(claveCategoria(n,true),mapaCat)}</span>
           <span class="tag${esRemfg?' remfg-tag':''}">${esc(n.ubic)}</span>
         </div>
         <div class="cuerpo">${miniFoto(n)}<div class="info">
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
           <div class="meta">${esc(n.tipo)} · SERIE ${esc(n.serie||'—')} · ${esc(n.fecha)}</div>
           <div class="meta">${esc(n.estado||'')} ${n.resp?'· 👤 '+esc(n.resp):''}</div>
-          ${n.precio?`<div class="meta">PRECIO EST.: <b>L ${formatoMoneda(n.precio)}</b></div>`:''}
+          ${esSup() && n.precio?`<div class="meta">PRECIO EST.: <b>L ${formatoMoneda(n.precio)}</b></div>`:''}
         </div></div>
         ${chips(n.cars)}
         <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':esRemfg?'remfg-est':'dispo'}">● ${esc(n.zona||'Recibido')}</div>
@@ -824,14 +863,14 @@ function renderVista(){
     v.innerHTML = avisoConfig + (lista.length ? lista.map(p=>`
       <div class="card parte">
         <div class="top">
-          <span><span class="id">${esc(p.id)}</span>${edadBadge(p.fecha)}</span>
+          <span><span class="id">${esc(p.id)}</span>${edadBadge(p.fecha)}${badgeCategoria(claveCategoria(p,false),mapaCat)}</span>
           <span class="tag">${esc(p.ubic)}</span>
         </div>
         <div class="cuerpo">${miniFoto(p)}<div class="info">
           <h3>${esc(p.tipo)}</h3>
           <div class="meta">ORIGEN: <b>${esc(p.origen||'—')}</b> · ${esc(p.cond||'')}</div>
           <div class="meta">${esc(p.fecha)} ${p.resp?'· 👤 '+esc(p.resp):''}</div>
-          ${p.precio?`<div class="meta">PRECIO: <b>L ${formatoMoneda(p.precio)}</b></div>`:''}
+          ${esSup() && p.precio?`<div class="meta">PRECIO: <b>L ${formatoMoneda(p.precio)}</b></div>`:''}
           ${p.modelos&&p.modelos.length?`<div class="meta" style="font-size:11px">MODELOS: ${esc(p.modelos.join(', '))}</div>`:''}
         </div></div>
         ${chips(p.cars)}
@@ -870,18 +909,18 @@ function renderVista(){
         d.fechaCompletado  ? `\u2705 COMPLETADO: <b>${esc(d.fechaCompletado)}</b>`       : ''
       ].filter(Boolean);
       return `<div class="card remfg">
-        <div class="top"><span class="id">${esc(n.id)}</span><span class="tag remfg-tag">${esc(n.ubic)}</span></div>
+        <div class="top"><span class="id">${esc(n.id)}${badgeCategoria(claveCategoria(n,true),mapaCat)}</span><span class="tag remfg-tag">${esc(n.ubic)}</span></div>
         <div class="cuerpo">${miniFoto(n)}<div class="info">
           <h3>${esc(n.marca)} ${esc(n.modelo)}</h3>
           <div class="meta">${esc(n.tipo)} \u00B7 SERIE ${esc(n.serie||'\u2014')}</div>
           <div class="meta">${esc(n.estado||'')} ${n.resp?'\u00B7 \u{1F464} '+esc(n.resp):''}</div>
-          ${precio
+          ${esSup() ? (precio
             ? `<div class="meta" style="color:var(--morado);font-weight:700">PRECIO RE-MFG: L ${formatoMoneda(precio)}</div>`
-            : `<div class="meta" style="color:#9B59D0;font-style:italic">\u26A0 Precio pendiente de diagn\u00F3stico</div>`}
+            : `<div class="meta" style="color:#9B59D0;font-style:italic">\u26A0 Precio pendiente de diagn\u00F3stico</div>`) : ''}
           ${fechas.length
             ? `<div class="meta" style="font-size:12px;margin-top:4px;line-height:1.9">${fechas.join('<br>')}</div>`
             : `<div class="meta" style="font-size:12px;color:#9B59D0">Sin fechas de proceso registradas</div>`}
-          ${d.notasDiagnostico ? `<div class="meta" style="font-size:12px;margin-top:3px">\u{1F4CB} ${esc(d.notasDiagnostico)}</div>` : ''}
+          ${esSup() && d.notasDiagnostico ? `<div class="meta" style="font-size:12px;margin-top:3px">\u{1F4CB} ${esc(d.notasDiagnostico)}</div>` : ''}
         </div></div>
         ${chips(n.cars)}
         <div class="estado remfg-est">\u25CF RE-MANUFACTURA</div>
@@ -928,7 +967,7 @@ function renderVista(){
       const pct = esNucleo ? pctRemfg(costoRemfg, item.precio) : null;
       return `<div class="card cons" style="${vendido?'opacity:.6':''}">
         <div class="top">
-          <span><span class="id">${esc(item.id)}</span>${edadBadge(item.fecha)}</span>
+          <span><span class="id">${esc(item.id)}</span>${edadBadge(item.fecha)}${badgeCategoria(claveCategoria(item,esNucleo),mapaCat)}</span>
           <span class="tag cons-tag">${esc(item.ubic)}</span>
         </div>
         <div class="cuerpo">${miniFoto(item)}<div class="info">
@@ -937,9 +976,9 @@ function renderVista(){
             ? esc(item.tipo)+' · SERIE '+esc(item.serie||'—')
             : 'PARTE · '+esc(item.cond||'')}</div>
           <div class="meta">ENVIADO: ${esc(item.consig?.fechaEnvio||'—')} ${item.consig?.resp?'· 👤 '+esc(item.consig.resp):''}</div>
-          ${item.precio?`<div class="meta">PRECIO VENTA EST.: <b>L ${formatoMoneda(item.precio)}</b></div>`:''}
-          ${costoRemfg?`<div class="meta">COSTO RE-MFG: <b>L ${formatoMoneda(costoRemfg)}</b></div>`:''}
-          ${pct!==null?`<div class="meta">% COSTO RE-MFG: <b style="color:${pctRemfgColor(pct)}">${pct.toFixed(2)}%</b></div>`:''}
+          ${esSup() && item.precio?`<div class="meta">PRECIO VENTA EST.: <b>L ${formatoMoneda(item.precio)}</b></div>`:''}
+          ${esSup() && costoRemfg?`<div class="meta">COSTO RE-MFG: <b>L ${formatoMoneda(costoRemfg)}</b></div>`:''}
+          ${esSup() && pct!==null?`<div class="meta">% COSTO RE-MFG: <b style="color:${pctRemfgColor(pct)}">${pct.toFixed(2)}%</b></div>`:''}
         </div></div>
         ${chips(item.cars)}
         <div class="estado ${vendido?'scrap':'cons-est'}">● ${vendido?'VENDIDO EN CONSIGNACIÓN':'EN CONSIGNACIÓN'}</div>
@@ -1109,8 +1148,67 @@ function renderVista(){
         return c>0?`<span class="tag" style="margin:2px">${esc(u)} · ${c}</span>`:'';}).join('')}</div>
       <div class="seccion-t">Equipo</div>
       <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)} <b style="color:${u.rol==='admin'?'#C9900A':u.rol==='supervisor'?'#2B5A87':'#666'}">(${(u.rol||'OP').toUpperCase()})</b></span>`).join('')||'<span class="meta">Sin usuarios aún</span>'}</div>
-      <button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (.xlsx)</button>
-      <div class="meta" style="margin-top:8px">Descarga un libro de Excel con una pestaña por tabla (Núcleos, Partes, Re-manufactura, Consignación, Movimientos) — sirve de respaldo semanal.</div>`;
+      ${esSup() ? `<button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (.xlsx)</button>
+      <div class="meta" style="margin-top:8px">Descarga un libro de Excel con una pestaña por tabla (Núcleos, Partes, Re-manufactura, Consignación, Movimientos) — sirve de respaldo semanal.</div>` : ''}`;
+  }
+
+  else if(tab==='categorias'){
+    if(!esSup()){
+      v.innerHTML = `<div class="vacio"><b>Sin acceso</b>Esta sección es solo para supervisores y administradores.</div>`;
+      return;
+    }
+    const nucleosVendidosZonas = ['Vendido - Re-manufactura','Vendido - Consignación'];
+    const nucleosDisp = D.nucleos.filter(n=>!nucleosVendidosZonas.includes(n.zona));
+    const partesDisp = D.partes.filter(p=>p.venta!=='Vendido');
+
+    function agrupar(lista, esNucleo){
+      const mapa = new Map();
+      lista.forEach(item=>{
+        const clave = claveCategoria(item, esNucleo);
+        if(!mapa.has(clave)){
+          let desc;
+          if(esNucleo){
+            desc = `${item.marca||''} ${item.modelo||''}`.trim() || 'SIN MARCA/MODELO';
+          } else {
+            const conCodigo = (item.cars||[]).find(c=>c.n && mayus(c.n).trim().startsWith('#') && c.v);
+            desc = conCodigo ? `${item.tipo||'PIEZA'} · ${conCodigo.v}` : `${item.tipo||'SIN TIPO'} (agrupado por tipo)`;
+          }
+          mapa.set(clave, { clave, desc, cantidad:0 });
+        }
+        mapa.get(clave).cantidad++;
+      });
+      return [...mapa.values()].sort((a,b)=>b.cantidad-a.cantidad);
+    }
+
+    function filaCategoria(fila){
+      const cat = mapaCat.get(fila.clave) || '';
+      const claveJs = fila.clave.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<div class="cat-fila">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px">${esc(fila.desc)}</div>
+          <div class="meta" style="font-size:12px">${fila.cantidad} disponible${fila.cantidad!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="cat-btn cat-a${cat==='A'?' on':''}" onclick="guardarCategoria('${claveJs}','A')">A</button>
+          <button class="cat-btn cat-b${cat==='B'?' on':''}" onclick="guardarCategoria('${claveJs}','B')">B</button>
+          <button class="cat-btn cat-c${cat==='C'?' on':''}" onclick="guardarCategoria('${claveJs}','C')">C</button>
+        </div>
+      </div>`;
+    }
+
+    const filasPartes = agrupar(partesDisp, false);
+    const filasNucleos = agrupar(nucleosDisp, true);
+
+    v.innerHTML = `
+      <div class="seccion-t">🚦 Categorización ABC</div>
+      <div class="aviso-morado">Agrupa las partes por su "# parte" (o por tipo cuando no tiene uno, como Coplín y Corona-Piñón) y los núcleos por marca/modelo. Asigna A (verde), B (amarillo) o C (rojo) — se puede cambiar cuando quieras y se ve como semáforo en cada tarjeta.</div>
+
+      <div class="seccion-t">Partes (${filasPartes.length} códigos/tipos · ${partesDisp.length} disponibles)</div>
+      ${filasPartes.length ? filasPartes.map(filaCategoria).join('') : `<div class="vacio">Sin partes disponibles para categorizar.</div>`}
+
+      <div class="seccion-t">Núcleos (${filasNucleos.length} modelos · ${nucleosDisp.length} disponibles)</div>
+      ${filasNucleos.length ? filasNucleos.map(filaCategoria).join('') : `<div class="vacio">Sin núcleos disponibles para categorizar.</div>`}
+    `;
   }
 }
 
@@ -1248,7 +1346,7 @@ function formNucleo(editId){
     <label>Fecha de ingreso</label>
     <input type="datetime-local" id="f-fecha" value="${ahoraLocal()}">
     <label>Estado visual</label><input id="f-estado" placeholder="CORROSIÓN LEVE, CARCASA ÍNTEGRA…">
-    <label>Precio estimado de venta (Lps)</label><input id="f-precio" type="number" inputmode="numeric" placeholder="0">
+    ${esSup() ? `<label>Precio estimado de venta (Lps)</label><input id="f-precio" type="number" inputmode="numeric" placeholder="0">` : ''}
     ${bloqueMack()}
     ${camposCars(SUG['Transmisión'])}
     <label>Notas</label><textarea id="f-notas" rows="2"></textarea>
@@ -1264,7 +1362,7 @@ function formNucleo(editId){
     $('#f-marca').value = e.marca||''; $('#f-modelo').value = e.modelo||'';
     $('#f-posicion').value = e.posicion||''; $('#f-serie').value = e.serie||'';
     $('#f-ubic').value = e.ubic||''; $('#f-estado').value = e.estado||'';
-    $('#f-precio').value = e.precio||'';
+    if($('#f-precio')) $('#f-precio').value = e.precio||'';
     $('#f-notas').value = e.notas||'';
     if(e.fecha) $('#f-fecha').value = e.fecha.length===10 ? e.fecha+'T00:00' : e.fecha;
     [0,1,2,3,4].forEach(i=>{ $('#cn'+i).value=''; $('#cv'+i).value=''; });
@@ -1312,7 +1410,7 @@ async function guardarNucleo(btn, editId){
     n.posicion=$('#f-posicion').value; n.serie=mayus($('#f-serie').value.trim());
     n.estado=mayus($('#f-estado').value.trim()); n.cars=leerCars();
     n.ubic=mayus($('#f-ubic').value.trim())||n.ubic; n.notas=mayus($('#f-notas').value.trim());
-    n.precio=$('#f-precio').value; n.fecha=fechaGuardar;
+    if($('#f-precio')) n.precio=$('#f-precio').value; n.fecha=fechaGuardar;
     if(mack && Object.values(mack).some(v=>v)) n.mack=mack;
     await persistir('nucleo', n);
     if(n.ubic!==ubicAnt) mov(editId, ubicAnt, n.ubic, 'Cambio de ubicación (edición)', fechaGuardar);
@@ -1326,7 +1424,7 @@ async function guardarNucleo(btn, editId){
     id, tipo, fecha:fechaGuardar,
     marca:mayus($('#f-marca').value.trim()), modelo:mayus($('#f-modelo').value.trim()),
     posicion:$('#f-posicion').value, serie:mayus($('#f-serie').value.trim()),
-    estado:mayus($('#f-estado').value.trim()), cars:leerCars(), foto, precio:$('#f-precio').value,
+    estado:mayus($('#f-estado').value.trim()), cars:leerCars(), foto, precio:$('#f-precio')?.value||'',
     ubic, zona:'Recibido', resp:USUARIO?USUARIO.nombre:'', notas:mayus($('#f-notas').value.trim())
   };
   if(mack && Object.values(mack).some(v=>v)) n.mack=mack;
@@ -1380,13 +1478,13 @@ function editarRemfg(id){
     <h2>🔧 DATOS RE-MANUFACTURA <button class="x" onclick="cerrarHoja()">✕</button></h2>
     <div class="nota-remfg"><b>${esc(n.marca)} ${esc(n.modelo)}</b> · ${esc(id)}</div>
 
-    <div class="carbloque" style="background:#EDE5F7;border:1.5px solid var(--morado)">
+    ${esSup() ? `<div class="carbloque" style="background:#EDE5F7;border:1.5px solid var(--morado)">
       <div class="titulo" style="color:var(--morado)">💰 Costos</div>
       <label>Precio de re-manufactura (Lps)</label>
       <input id="re-precio" type="number" inputmode="numeric" placeholder="0" value="${esc(d.precio||'')}">
       <label>Notas de cotización / diagnóstico</label>
       <textarea id="re-notas-diag" rows="3" placeholder="REPUESTOS REQUERIDOS, COSTO DE MANO DE OBRA…">${esc(d.notasDiagnostico||'')}</textarea>
-    </div>
+    </div>` : ''}
 
     <div class="carbloque" style="background:#EDE5F7;border:1.5px solid var(--morado);margin-top:10px">
       <div class="titulo" style="color:var(--morado)">📅 Fechas del proceso</div>
@@ -1426,8 +1524,11 @@ async function guardarDatosRemfg(id){
     fechaDiagnostico:  $('#re-f-diagnostico').value || '',
     fechaRepuestos:    $('#re-f-repuestos').value   || '',
     fechaCompletado:   $('#re-f-completado').value  || '',
-    precio:            $('#re-precio').value         || '',
-    notasDiagnostico:  mayus($('#re-notas-diag').value.trim()),
+    /* Los campos re-precio/re-notas-diag no existen en el formulario para
+       operadores (esSup()===false) — se conserva lo que ya había en vez
+       de borrarlo por no estar presente. */
+    precio:            $('#re-precio') ? ($('#re-precio').value||'') : (n.remfgDatos?.precio||''),
+    notasDiagnostico:  $('#re-notas-diag') ? mayus($('#re-notas-diag').value.trim()) : (n.remfgDatos?.notasDiagnostico||''),
     notasIngreso:      n.remfgDatos?.notasIngreso   || ''
   };
   /* Compatibilidad hacia atrás: también actualizar campo legacy */
@@ -1521,7 +1622,7 @@ function formParte(origen){
           <option>REPARACIÓN REQUERIDA</option><option>NUEVO</option>
         </select>
       </div>
-      <div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>
+      ${esSup() ? `<div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>` : ''}
     </div>
     <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic" placeholder="A3-02-05, E22…">
     <label>Fecha</label>
@@ -1559,7 +1660,7 @@ async function guardarParte(btn, origen){
   const modelos = leerModelos();
   const p = {
     id, origen:orig, tipo:mayus($('#p-tipo').value.trim())||'PIEZA',
-    cond:$('#p-cond').value, precio:$('#p-precio').value,
+    cond:$('#p-cond').value, precio:$('#p-precio')?.value||'',
     cars:leerCars(), foto, ubic, fecha:fechaGuardar, venta:'Disponible',
     resp:USUARIO?USUARIO.nombre:'', notas:mayus($('#p-notas').value.trim()),
     modelos
@@ -1584,7 +1685,7 @@ function formEditarParte(id){
           <option>REPARACIÓN REQUERIDA</option><option>NUEVO</option>
         </select>
       </div>
-      <div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>
+      ${esSup() ? `<div><label>Precio sugerido (Lps)</label><input id="p-precio" type="number" inputmode="numeric"></div>` : ''}
     </div>
     <label>Ubicación / estante</label><input id="p-ubic" list="dl-ubic">
     <label>Fecha del movimiento</label>
@@ -1595,7 +1696,7 @@ function formEditarParte(id){
     <button class="guardar" onclick="guardarEdicionParte(this,'${id}')">Guardar cambios</button>`);
 
   $('#p-tipo').value=e.tipo||''; $('#p-cond').value=e.cond||'USADO - BUEN ESTADO';
-  $('#p-precio').value=e.precio||''; $('#p-ubic').value=e.ubic||''; $('#p-notas').value=e.notas||'';
+  if($('#p-precio')) $('#p-precio').value=e.precio||''; $('#p-ubic').value=e.ubic||''; $('#p-notas').value=e.notas||'';
   (e.cars||[]).slice(0,5).forEach((c,i)=>{ $('#cn'+i).value=c.n||''; $('#cv'+i).value=c.v||''; });
   if(e.foto){ const p=$('#foto-prev'); p.src=e.foto; p.style.display='block'; $('#fotobtn-txt').textContent='✓ Ya tiene foto'; }
 
@@ -1611,7 +1712,7 @@ async function guardarEdicionParte(btn, id){
   const fechaVal = $('#p-fecha').value||ahoraLocal();
   const fechaGuardar = fechaVal.slice(0,10);
   p.tipo=mayus($('#p-tipo').value.trim())||p.tipo; p.cond=$('#p-cond').value;
-  p.precio=$('#p-precio').value; p.cars=leerCars();
+  if($('#p-precio')) p.precio=$('#p-precio').value; p.cars=leerCars();
   p.ubic=mayus($('#p-ubic').value.trim())||p.ubic; p.notas=mayus($('#p-notas').value.trim());
   p.fecha=fechaGuardar; p.modelos=leerModelos();
   await persistir('parte', p);
