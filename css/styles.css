@@ -180,6 +180,21 @@
   .edad-rojo    {background:#FDECEA;color:#7A1A12;border-color:#E08078}
   .filtro-btn.edad-on{background:#4A4F55;color:#fff;border-color:#9AA0A8}
 
+  /* ── CATEGORÍA ABC (semáforo) ── */
+  .cat-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+    border-radius:5px;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:12px;color:#fff;
+    margin-left:6px;vertical-align:middle;flex-shrink:0}
+  .cat-badge.cat-a{background:var(--ok)}
+  .cat-badge.cat-b{background:#C9900A}
+  .cat-badge.cat-c{background:var(--rojo)}
+  .cat-btn{border:1.5px solid #C6C2BA;background:#fff;border-radius:8px;width:44px;height:40px;
+    font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:15px;cursor:pointer;color:#4A4F55}
+  .cat-btn.cat-a.on{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .cat-btn.cat-b.on{background:#C9900A;color:#fff;border-color:#C9900A}
+  .cat-btn.cat-c.on{background:var(--rojo);color:#fff;border-color:var(--rojo)}
+  .cat-fila{display:flex;justify-content:space-between;align-items:center;background:#fff;
+    border-radius:10px;padding:10px 12px;margin-bottom:8px;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
   /* ── CONSIGNACIÓN ── */
   .card.cons{border-left-color:var(--verde-cons)}
   .card.cons .id{color:var(--verde-cons)}
