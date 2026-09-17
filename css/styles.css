@@ -142,7 +142,7 @@
   .ubtn:active{background:#3C4148}
   .ubtn .ini{display:inline-block;width:34px;height:34px;background:var(--azul);border-radius:50%;text-align:center;line-height:34px;margin-right:12px;font-family:'Saira Condensed';font-weight:700}
   .ubtn .rol-chip{float:right;font-size:11px;background:#23272C;padding:2px 8px;border-radius:10px;margin-top:2px}
-  .rol-admin{color:var(--amarillo)} .rol-sup{color:#7EC8FF} .rol-op{color:#9AA0A8}
+  .rol-admin{color:var(--amarillo)} .rol-sup{color:#7EC8FF} .rol-op{color:#9AA0A8} .rol-ccnbm{color:#5FD8C8}
   #login label{color:#B9BEC5}
   #login input{background:#31363D;border-color:#4A4F55;color:var(--blanco)}
   #login .guardar{background:var(--naranja)}
