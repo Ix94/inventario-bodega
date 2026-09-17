@@ -9,7 +9,7 @@ const CACHE = 'bodega:cache', SESION = 'bodega:usuario';
 const UBIC_BASE = ['REC-01','TALLER ZAPOTAL','TRI-01','DSM-01','DSM-02','CMP-01','SCR-01','A20','A23','E7','E22','G17','S2'];
 
 /* ── ROLES: 'admin' | 'supervisor' | 'operador' ── */
-const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador' };
+const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador', CCNBM:'ccn_bm' };
 const ADMIN_ID = 'USR-ixel-flores';  // fallback mientras el campo rol esté en BD
 
 let D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[] };
@@ -209,6 +209,14 @@ const rolUsuario = () => {
 const esAdmin   = () => rolUsuario() === ROL.ADMIN;
 const esSup     = () => esAdmin() || rolUsuario() === ROL.SUP;
 const puedeElim = () => esSup();
+/* CCN BM: rol de acceso muy acotado — solo "Datos Re-Mfg" en Re-Mfg,
+   "Marcar vendido" en Consignación, exportar en Resumen y categorizar
+   en Categ. Ve el resto de las pestañas, pero sin botones de acción. */
+const esCCNBM = () => rolUsuario() === ROL.CCNBM;
+/* Sin botones de acción / sin FAB en Núcleos y Partes (solo lectura) */
+const soloAccionesLimitadas = () => SOLO_VER || esCCNBM();
+const puedeExportar    = () => esSup() || esCCNBM();
+const puedeCategorizar = () => esSup() || esCCNBM();
 
 /* =====================================================================
    USUARIOS
@@ -218,7 +226,7 @@ function pintarUsuario(){
   const lbl = SOLO_VER ? '👁 SOLO LECTURA' : ('👤 ' + (USUARIO ? USUARIO.nombre.toUpperCase() : '—'));
   $('#usuario-chip').textContent = lbl;
   const navCat = $('#nav-categorias');
-  if(navCat) navCat.style.display = esSup() ? '' : 'none';
+  if(navCat) navCat.style.display = puedeCategorizar() ? '' : 'none';
 }
 function pedirUsuario(){
   if(SOLO_VER) return;
@@ -227,8 +235,8 @@ function pedirUsuario(){
     <p>Todo lo que registres quedará firmado con tu nombre en la trazabilidad.</p>
     ${D.usuarios.map(u=>{
       const r = u.rol || (u.id===ADMIN_ID ? 'admin' : 'operador');
-      const rc = r==='admin'?'rol-admin':r==='supervisor'?'rol-sup':'rol-op';
-      const rl = r==='admin'?'ADMIN':r==='supervisor'?'SUPERVISOR':'OPERADOR';
+      const rc = r==='admin'?'rol-admin':r==='supervisor'?'rol-sup':r==='ccn_bm'?'rol-ccnbm':'rol-op';
+      const rl = r==='admin'?'ADMIN':r==='supervisor'?'SUPERVISOR':r==='ccn_bm'?'CCN BM':'OPERADOR';
       return `<button class="ubtn" onclick="entrar('${esc(u.id)}')">
         <span class="ini">${esc(u.nombre.charAt(0).toUpperCase())}</span>${esc(u.nombre)}
         <span class="rol-chip ${rc}">${rl}</span></button>`;
@@ -244,6 +252,7 @@ function formUsuario(){
     <label>Rol</label>
     <select id="u-rol">
       <option value="operador">OPERADOR — captura y edición</option>
+      <option value="ccn_bm">CCN BM — Datos Re-Mfg, marcar vendido, exportar y categorizar</option>
       <option value="supervisor">SUPERVISOR — puede eliminar registros</option>
       <option value="admin">ADMIN — control total</option>
     </select>
@@ -290,7 +299,7 @@ function formGestionUsuarios(){
   const filas = D.usuarios.filter(u=>u.id!==ADMIN_ID).map(u=>{
     const r = u.rol||'operador';
     return `<div style="background:#31363D;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-      <div><b style="color:#fff">${esc(u.nombre)}</b><br><span style="font-size:12px;color:#9AA0A8">${r.toUpperCase()}</span></div>
+      <div><b style="color:#fff">${esc(u.nombre)}</b><br><span style="font-size:12px;color:#9AA0A8">${r==='ccn_bm'?'CCN BM':r.toUpperCase()}</span></div>
       <button onclick="cambiarRolUsuario('${esc(u.id)}')" style="background:#4A4F55;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">Cambiar rol</button>
     </div>`;
   }).join('');
@@ -300,10 +309,10 @@ function formGestionUsuarios(){
 }
 function cambiarRolUsuario(id){
   const u = D.usuarios.find(x=>x.id===id); if(!u) return;
-  const nuevoRol = prompt(`Rol actual de ${u.nombre}: ${u.rol||'operador'}\n\nEscribe el nuevo rol:\n  operador\n  supervisor\n  admin`);
-  if(!nuevoRol || !['operador','supervisor','admin'].includes(nuevoRol.toLowerCase())) return;
+  const nuevoRol = prompt(`Rol actual de ${u.nombre}: ${u.rol||'operador'}\n\nEscribe el nuevo rol:\n  operador\n  ccn_bm\n  supervisor\n  admin`);
+  if(!nuevoRol || !['operador','ccn_bm','supervisor','admin'].includes(nuevoRol.toLowerCase())) return;
   u.rol = nuevoRol.toLowerCase(); persistir('usuario', u);
-  alert(`Rol de ${u.nombre} actualizado a: ${u.rol.toUpperCase()}`);
+  alert(`Rol de ${u.nombre} actualizado a: ${u.rol==='ccn_bm'?'CCN BM':u.rol.toUpperCase()}`);
   formGestionUsuarios();
 }
 function salirUsuario(){ USUARIO = null; localStorage.removeItem(SESION); pintarUsuario(); pedirUsuario(); }
@@ -799,12 +808,12 @@ function render(){
 function renderVista(){
   /* Si cambia de usuario en el mismo dispositivo y el que entra no es
      supervisor/admin, sacarlo de la pestaña de Categorías. */
-  if(tab==='categorias' && !esSup()){ tab='nucleos'; marcarTab(); }
+  if(tab==='categorias' && !puedeCategorizar()){ tab='nucleos'; marcarTab(); }
   const v = $('#vista');
   /* Habilita el layout de columnas para PC solo en las pestañas que son
      listas de tarjetas — ver css/styles.css @media (min-width:900px). */
   v.classList.toggle('vista-cards', tab==='nucleos'||tab==='partes'||tab==='remfg'||tab==='cons');
-  const puedeAgregar = !SOLO_VER && (tab==='nucleos'||tab==='partes');
+  const puedeAgregar = !soloAccionesLimitadas() && (tab==='nucleos'||tab==='partes');
   $('#fab').style.display = puedeAgregar ? 'block':'none';
   const mapaCat = mapaCategorias();
   const avisoConfig = !sb ? `<div class="aviso"><b>Modo local:</b> guardando solo en este dispositivo. Para compartir, configura Supabase en index.html.</div>` : '';
@@ -838,7 +847,7 @@ function renderVista(){
         </div></div>
         ${chips(n.cars)}
         <div class="estado ${n.zona==='Desmontado'?'desm':n.zona==='Scrap'?'scrap':esRemfg?'remfg-est':'dispo'}">● ${esc(n.zona||'Recibido')}</div>
-        ${SOLO_VER ? '' : `<div class="acciones">
+        ${soloAccionesLimitadas() ? '' : `<div class="acciones">
           <button onclick="formNucleo('${n.id}')">✎ Editar</button>
           <button onclick="formMover('${n.id}')">Mover</button>
           <button onclick="duplicarNucleo(this,'${n.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
@@ -875,7 +884,7 @@ function renderVista(){
         </div></div>
         ${chips(p.cars)}
         <div class="estado ${p.venta==='Vendido'?'scrap':'dispo'}">● ${esc(p.venta||'Disponible')}</div>
-        ${SOLO_VER ? '' : `<div class="acciones">
+        ${soloAccionesLimitadas() ? '' : `<div class="acciones">
           <button onclick="formEditarParte('${p.id}')">✎ Editar</button>
           <button onclick="formMover('${p.id}')">Mover</button>
           <button onclick="duplicarParte(this,'${p.id}')" title="Crear copia con nuevo ID">⧉ Duplicar</button>
@@ -905,7 +914,10 @@ function renderVista(){
       const fechas = [
         d.fechaIngreso     ? `\u{1F4E5} INGRESO: <b>${esc(d.fechaIngreso)}</b>`         : '',
         d.fechaDiagnostico ? `\u{1F50D} DIAGN\u00D3STICO: <b>${esc(d.fechaDiagnostico)}</b>` : '',
-        d.fechaRepuestos   ? `\u{1F4E6} REPUESTOS: <b>${esc(d.fechaRepuestos)}</b>`      : '',
+        d.fechaRepuestosRTD ? `\u{1F4E6} REPUESTOS RTD: <b>${esc(d.fechaRepuestosRTD)}</b>` : '',
+        d.fechaRepuestosBM  ? `\u{1F4E6} REPUESTOS BM: <b>${esc(d.fechaRepuestosBM)}</b>`   : '',
+        d.fechaRepuestosCL  ? `\u{1F4E6} REPUESTOS CL: <b>${esc(d.fechaRepuestosCL)}</b>`   : '',
+        (!d.fechaRepuestosRTD && !d.fechaRepuestosBM && !d.fechaRepuestosCL && d.fechaRepuestos) ? `\u{1F4E6} REPUESTOS: <b>${esc(d.fechaRepuestos)}</b>` : '',
         d.fechaCompletado  ? `\u2705 COMPLETADO: <b>${esc(d.fechaCompletado)}</b>`       : ''
       ].filter(Boolean);
       return `<div class="card remfg">
@@ -926,10 +938,12 @@ function renderVista(){
         <div class="estado remfg-est">\u25CF RE-MANUFACTURA</div>
         ${SOLO_VER ? '' : `<div class="acciones">
           <button class="morado" onclick="editarRemfg('${n.id}')">\u2702 Datos Re-Mfg</button>
+          ${esCCNBM() ? '' : `
           <button onclick="formMover('${n.id}')">Mover</button>
           <button class="cons" onclick="moverAConsig('nucleo','${n.id}')">🏪 Mover a Consig.</button>
           <button class="morado" onclick="devolverFlujo('${n.id}')">\u21A9 Devolver al flujo</button>
           ${puedeElim()?`<button class="peligro-sup" onclick="borrar('nucleos','${n.id}')">\u2715</button>`:''}
+          `}
         </div>`}
       </div>`;
     }).join('') :
@@ -985,9 +999,9 @@ function renderVista(){
         ${SOLO_VER?'':`<div class="acciones">
           ${!vendido
             ? `<button class="warn" onclick="venderEnConsig('${item._col}','${item.id}')">💰 Marcar vendido</button>`
-            : `<button onclick="revertirVentaCons('${item._col}','${item.id}')">↩ Revertir venta</button>`}
-          <button onclick="quitarDeConsig('${item._col}','${item.id}')">↩ Devolver a bodega</button>
-          ${puedeElim()?`<button class="peligro-sup" onclick="borrar('${item._col==='nucleo'?'nucleos':'partes'}','${item.id}')">✕</button>`:''}
+            : (esCCNBM() ? '' : `<button onclick="revertirVentaCons('${item._col}','${item.id}')">↩ Revertir venta</button>`)}
+          ${esCCNBM() ? '' : `<button onclick="quitarDeConsig('${item._col}','${item.id}')">↩ Devolver a bodega</button>`}
+          ${(!esCCNBM() && puedeElim())?`<button class="peligro-sup" onclick="borrar('${item._col==='nucleo'?'nucleos':'partes'}','${item.id}')">✕</button>`:''}
         </div>`}
       </div>`;
     }
@@ -1147,13 +1161,13 @@ function renderVista(){
         const c = D.nucleos.filter(n=>n.ubic===u).length + D.partes.filter(p=>p.ubic===u).length;
         return c>0?`<span class="tag" style="margin:2px">${esc(u)} · ${c}</span>`:'';}).join('')}</div>
       <div class="seccion-t">Equipo</div>
-      <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)} <b style="color:${u.rol==='admin'?'#C9900A':u.rol==='supervisor'?'#2B5A87':'#666'}">(${(u.rol||'OP').toUpperCase()})</b></span>`).join('')||'<span class="meta">Sin usuarios aún</span>'}</div>
-      ${esSup() ? `<button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (.xlsx)</button>
+      <div class="chips">${D.usuarios.map(u=>`<span class="chip">👤 ${esc(u.nombre)} <b style="color:${u.rol==='admin'?'#C9900A':u.rol==='supervisor'?'#2B5A87':u.rol==='ccn_bm'?'#1A6B6B':'#666'}">(${u.rol==='ccn_bm'?'CCN BM':(u.rol||'OP').toUpperCase()})</b></span>`).join('')||'<span class="meta">Sin usuarios aún</span>'}</div>
+      ${puedeExportar() ? `<button class="exportar" onclick="exportar()">⬇ Exportar todo a Excel (.xlsx)</button>
       <div class="meta" style="margin-top:8px">Descarga un libro de Excel con una pestaña por tabla (Núcleos, Partes, Re-manufactura, Consignación, Movimientos) — sirve de respaldo semanal.</div>` : ''}`;
   }
 
   else if(tab==='categorias'){
-    if(!esSup()){
+    if(!puedeCategorizar()){
       v.innerHTML = `<div class="vacio"><b>Sin acceso</b>Esta sección es solo para supervisores y administradores.</div>`;
       return;
     }
@@ -1462,7 +1476,9 @@ async function confirmarRemfg(id){
     fechaIngreso: fecha,
     notasIngreso: notas,
     fechaDiagnostico: '',
-    fechaRepuestos: '',
+    fechaRepuestosRTD: '',
+    fechaRepuestosBM: '',
+    fechaRepuestosCL: '',
     fechaCompletado: '',
     precio: '',
     notasDiagnostico: ''
@@ -1498,11 +1514,22 @@ function editarRemfg(id){
           <input type="date" id="re-f-diagnostico" value="${esc(d.fechaDiagnostico||'')}">
         </div>
       </div>
-      <div class="fila2" style="margin-top:8px">
+      <div class="titulo" style="margin-top:12px">Entrega de repuestos por departamento</div>
+      <div class="fila3" style="margin-top:8px">
         <div>
-          <label>Fecha entrega repuestos</label>
-          <input type="date" id="re-f-repuestos" value="${esc(d.fechaRepuestos||'')}">
+          <label>RTD</label>
+          <input type="date" id="re-f-repuestos-rtd" value="${esc(d.fechaRepuestosRTD||'')}">
         </div>
+        <div>
+          <label>Bodega mayoreo (BM)</label>
+          <input type="date" id="re-f-repuestos-bm" value="${esc(d.fechaRepuestosBM||'')}">
+        </div>
+        <div>
+          <label>Compra local (CL)</label>
+          <input type="date" id="re-f-repuestos-cl" value="${esc(d.fechaRepuestosCL||'')}">
+        </div>
+      </div>
+      <div class="fila2" style="margin-top:8px">
         <div>
           <label>Fecha completado</label>
           <input type="date" id="re-f-completado" value="${esc(d.fechaCompletado||'')}">
@@ -1522,7 +1549,12 @@ async function guardarDatosRemfg(id){
   n.remfgDatos = {
     fechaIngreso:      $('#re-f-ingreso').value     || (n.remfgDatos?.fechaIngreso||''),
     fechaDiagnostico:  $('#re-f-diagnostico').value || '',
-    fechaRepuestos:    $('#re-f-repuestos').value   || '',
+    fechaRepuestosRTD: $('#re-f-repuestos-rtd').value || '',
+    fechaRepuestosBM:  $('#re-f-repuestos-bm').value  || '',
+    fechaRepuestosCL:  $('#re-f-repuestos-cl').value  || '',
+    /* Registros antiguos con una sola fecha de repuestos (antes de
+       separar por RTD/BM/CL) — se conserva para no perder el dato. */
+    fechaRepuestos:    n.remfgDatos?.fechaRepuestos || '',
     fechaCompletado:   $('#re-f-completado').value  || '',
     /* Los campos re-precio/re-notas-diag no existen en el formulario para
        operadores (esSup()===false) — se conserva lo que ya había en vez
@@ -2051,7 +2083,7 @@ function exportar(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasPartes), 'Partes');
 
   /* ── Re-manufactura: todo núcleo que alguna vez pasó por el proceso ── */
-  const filasRemfg = [['ID','Marca','Modelo','Serie','Estado Actual','Fecha Ingreso Taller','Notas Ingreso','Fecha Diagnóstico','Fecha Entrega Repuestos','Fecha Completado','Costo Re-Mfg (Lps)','Notas Diagnóstico','Precio Venta Est. (Lps)','% Costo Re-Mfg','Vendido en Re-Mfg','Fecha Venta','Cliente','Precio Venta Real (Lps)','Notas Venta']];
+  const filasRemfg = [['ID','Marca','Modelo','Serie','Estado Actual','Fecha Ingreso Taller','Notas Ingreso','Fecha Diagnóstico','Fecha Entrega Repuestos RTD','Fecha Entrega Repuestos BM','Fecha Entrega Repuestos CL','Fecha Completado','Costo Re-Mfg (Lps)','Notas Diagnóstico','Precio Venta Est. (Lps)','% Costo Re-Mfg','Vendido en Re-Mfg','Fecha Venta','Cliente','Precio Venta Real (Lps)','Notas Venta']];
   D.nucleos
     .filter(n=>n.remfgDatos||n.precioRemfg||n.ventaRemfg||n.zona==='Re-manufactura'||n.zona==='Vendido - Re-manufactura')
     .forEach(n=>{
@@ -2060,7 +2092,8 @@ function exportar(){
       const pct = pctRemfg(costo, n.precio);
       const vr = n.ventaRemfg||{};
       const vendidoRemfg = n.zona==='Vendido - Re-manufactura' ? 'SÍ' : 'NO';
-      filasRemfg.push([n.id,n.marca,n.modelo,n.serie,n.zona,d.fechaIngreso||'',d.notasIngreso||'',d.fechaDiagnostico||'',d.fechaRepuestos||'',d.fechaCompletado||'',
+      filasRemfg.push([n.id,n.marca,n.modelo,n.serie,n.zona,d.fechaIngreso||'',d.notasIngreso||'',d.fechaDiagnostico||'',
+        d.fechaRepuestosRTD||d.fechaRepuestos||'',d.fechaRepuestosBM||'',d.fechaRepuestosCL||'',d.fechaCompletado||'',
         costo,d.notasDiagnostico||'',n.precio||'',pct!==null?pct.toFixed(2)+'%':'',vendidoRemfg,vr.fecha||'',vr.cliente||'',vr.precio||'',vr.notas||'']);
     });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasRemfg), 'Re-manufactura');
