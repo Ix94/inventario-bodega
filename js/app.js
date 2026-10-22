@@ -21,6 +21,7 @@ let cicloActivo = null;         // id de la sesión (D.ciclicos) que se está co
 let cicloIrregularidad = null;  // { codigo, ubicActual } pendiente de corregir/reportar
 let cicloUltimo = null;         // último resultado escaneado, para feedback inmediato
 let cicloPrefijoNucleo = 'TR';  // 'TR' | 'DF' — prefijo activo al contar núcleos
+let cicloDetalle = null;        // id de la sesión (D.ciclicos) que se está viendo en detalle
 
 /* ── CONSIGNACIÓN — helpers ── */
 function semanaKey(fechaStr){
@@ -1243,6 +1244,27 @@ function renderVista(){
       return;
     }
 
+    /* ── Ver el detalle (faltantes, encontrados, etc.) de un conteo del historial ── */
+    if(cicloDetalle){
+      const s = D.ciclicos.find(x=>x.id===cicloDetalle);
+      if(s){
+        const extras = Object.keys(s.resultados).filter(id=>!s.esperados.includes(id));
+        const cumpTxt = s.estado==='abierto' ? 'EN CURSO' : (s.cumplimiento!=null ? s.cumplimiento.toFixed(1)+'%' : '—');
+        v.innerHTML = `
+          <div class="seccion-t">📋 Detalle del conteo — ${s.tipo==='nucleo'?'Núcleos':'Partes'} · ${esc(s.ubic)}</div>
+          <div class="meta">${esc(s.fecha)}${s.fechaCierre?' → '+esc(s.fechaCierre):''} · 👤 ${esc(s.resp)} · ${esc(cumpTxt)}</div>
+          <div style="display:flex;gap:8px;margin:10px 0">
+            <button onclick="volverDetalleCiclico()" style="flex:1;padding:10px;background:transparent;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-weight:700;cursor:pointer">← Volver al historial</button>
+            ${esAdmin() ? `<button onclick="reabrirCiclico('${s.id}')" style="flex:1;padding:10px;background:transparent;border:1.5px solid var(--naranja);color:var(--naranja);border-radius:8px;font-weight:700;cursor:pointer">✎ Reabrir para editar</button>` : ''}
+          </div>
+          <div class="seccion-t">Esperados en esta ubicación (${s.esperados.length})</div>
+          ${s.esperados.length ? s.esperados.map(id=>filaCiclico(id, s)).join('') : `<div class="vacio">Sin ítems esperados.</div>`}
+          ${extras.length ? `<div class="seccion-t">Códigos adicionales escaneados</div>${extras.map(id=>filaCiclico(id, s)).join('')}` : ''}`;
+        return;
+      }
+      cicloDetalle = null;
+    }
+
     if(!cicloActivo){
       const abierto = D.ciclicos.find(s=>s.estado==='abierto' && s.resp===(USUARIO?USUARIO.nombre:''));
       if(abierto) cicloActivo = abierto.id;
@@ -1386,9 +1408,9 @@ function filaHistorialCiclico(s){
   const cumpTxt = s.estado==='abierto' ? 'EN CURSO' : (s.cumplimiento!=null ? s.cumplimiento.toFixed(1)+'%' : '—');
   const cumpCls = s.estado==='abierto' ? 'cic-pend' : (s.cumplimiento>=90 ? 'cic-ok' : s.cumplimiento>=70 ? 'cic-reub' : 'cic-falt');
   const btnElim = esAdmin()
-    ? `<button onclick="eliminarCiclico('${s.id}')" title="Eliminar conteo" style="border:none;background:transparent;color:var(--rojo);font-size:16px;cursor:pointer;padding:0 2px">🗑</button>`
+    ? `<button onclick="event.stopPropagation();eliminarCiclico('${s.id}')" title="Eliminar conteo" style="border:none;background:transparent;color:var(--rojo);font-size:16px;cursor:pointer;padding:0 2px">🗑</button>`
     : '';
-  return `<div class="cic-hist-fila">
+  return `<div class="cic-hist-fila" onclick="verDetalleCiclico('${s.id}')" style="cursor:pointer">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
       <b>${esc(s.ubic)} · ${s.tipo==='nucleo'?'Núcleos':'Partes'}</b>
       <span style="display:flex;align-items:center;gap:6px">
@@ -1398,6 +1420,7 @@ function filaHistorialCiclico(s){
     </div>
     <div class="meta">${esc(s.fecha)}${s.fechaCierre?' → '+esc(s.fechaCierre):''} · 👤 ${esc(s.resp)}</div>
     <div class="meta">${total} esperados · ${confirmados} confirmados · ${faltantes} faltantes · ${reubicados} reubicados · ${reportados} reportados</div>
+    <div class="meta" style="font-size:11px;color:#9AA0A8;margin-top:4px">Toca para ver el detalle →</div>
   </div>`;
 }
 async function iniciarCiclico(){
@@ -1553,6 +1576,27 @@ function eliminarCiclico(id){
     async ()=>{
       D.ciclicos = D.ciclicos.filter(s=>s.id!==id);
       await eliminar(id);
+      render();
+    }
+  );
+}
+function verDetalleCiclico(id){ cicloDetalle = id; render(); }
+function volverDetalleCiclico(){ cicloDetalle = null; render(); }
+/* Reabrir un conteo ya cerrado para corregirlo — solo admin. Lo vuelve a
+   dejar "abierto" y lo retoma en la pantalla de escaneo normal; al
+   Finalizar de nuevo se recalcula el % de cumplimiento. */
+function reabrirCiclico(id){
+  if(!esAdmin()) return;
+  const sesion = D.ciclicos.find(s=>s.id===id);
+  if(!sesion) return;
+  pedirConfirm(
+    '¿Reabrir este conteo?',
+    'Podrás volver a escanear y corregir resultados. Al finalizar se recalculará el % de cumplimiento.',
+    async ()=>{
+      sesion.estado = 'abierto';
+      sesion.fechaCierre = '';
+      await persistir('ciclico', sesion);
+      cicloActivo = sesion.id; cicloDetalle = null; cicloIrregularidad = null; cicloUltimo = null; cicloPrefijoNucleo = 'TR';
       render();
     }
   );
@@ -2454,6 +2498,22 @@ function exportar(){
       s.resp, s.cumplimiento!=null?s.cumplimiento.toFixed(2)+'%':'', s.esperados.length, confirmados, faltantes, reubicados, reportados, noReg]);
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasCiclicos), 'Conteos Cíclicos');
+
+  /* ── Conteos cíclicos: detalle ítem por ítem (faltantes, encontrados, etc.) ── */
+  const ESTADO_LBL = { pendiente:'PENDIENTE', confirmado:'CONFIRMADO', faltante:'FALTANTE', reubicado:'REUBICADO', reportado:'REPORTADO', no_registrado:'NO REGISTRADO' };
+  const filasCiclicosDetalle = [['Sesión','Ubicación','Tipo','Fecha','Responsable','Código','Descripción','Estado','Ubicación Encontrada','Notas']];
+  D.ciclicos.forEach(s=>{
+    const lista = listaCiclico(s.tipo);
+    const claves = [...new Set([...s.esperados, ...Object.keys(s.resultados)])];
+    claves.forEach(id=>{
+      const r = s.resultados[id] || { estado:'pendiente', ubicOriginal:'', notas:'' };
+      const item = lista.find(it=>it.id===id);
+      const desc = item ? (s.tipo==='nucleo' ? `${item.marca||''} ${item.modelo||''}`.trim() : (item.tipo||'')) : '';
+      filasCiclicosDetalle.push([s.id, s.ubic, s.tipo==='nucleo'?'Núcleos':'Partes', s.fecha, s.resp, id, desc,
+        ESTADO_LBL[r.estado]||r.estado, r.ubicOriginal||'', r.notas||'']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasCiclicosDetalle), 'Cíclicos Detalle');
 
   XLSX.writeFile(wb, `inventario_bodega_${hoy()}.xlsx`);
 }
