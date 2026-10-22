@@ -195,6 +195,24 @@
   .cat-fila{display:flex;justify-content:space-between;align-items:center;background:#fff;
     border-radius:10px;padding:10px 12px;margin-bottom:8px;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 
+  /* ── CONTEO CÍCLICO ── */
+  .cic-fila{display:flex;justify-content:space-between;align-items:center;background:#fff;
+    border-radius:8px;padding:8px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .cic-pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;
+    padding:3px 9px;border-radius:12px;white-space:nowrap}
+  .cic-pend{background:#E8E6E0;color:#6B7076}
+  .cic-ok{background:#E8F5EC;color:#1E6B35}
+  .cic-falt{background:#FDECEA;color:#7A1A12}
+  .cic-reub{background:#E8F0F8;color:var(--azul-osc)}
+  .cic-rep{background:#FFF4E2;color:#6B4A12}
+  .cic-norg{background:#F3EEF9;color:#4A2080}
+  .cic-msg{border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;margin:10px 0}
+  .cic-msg-confirmado{background:#E8F5EC;color:#1E6B35}
+  .cic-msg-no_registrado{background:#FDECEA;color:#7A1A12}
+  .cic-msg-reubicado{background:#E8F0F8;color:var(--azul-osc)}
+  .cic-msg-reportado{background:#FFF4E2;color:#6B4A12}
+  .cic-hist-fila{background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
   /* ── CONSIGNACIÓN ── */
   .card.cons{border-left-color:var(--verde-cons)}
   .card.cons .id{color:var(--verde-cons)}
