@@ -12,9 +12,15 @@ const UBIC_BASE = ['REC-01','TALLER ZAPOTAL','TRI-01','DSM-01','DSM-02','CMP-01'
 const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador', CCNBM:'ccn_bm' };
 const ADMIN_ID = 'USR-ixel-flores';  // fallback mientras el campo rol esté en BD
 
-let D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[] };
+let D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[], ciclicos:[] };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
 let confirmCallback = null;
+
+/* ── CONTEO CÍCLICO — estado de la sesión activa en este dispositivo ── */
+let cicloActivo = null;         // id de la sesión (D.ciclicos) que se está contando ahora
+let cicloIrregularidad = null;  // { codigo, ubicActual } pendiente de corregir/reportar
+let cicloUltimo = null;         // último resultado escaneado, para feedback inmediato
+let cicloVista = 'conteo';      // 'conteo' | 'historial' (historial solo admin)
 
 /* ── CONSIGNACIÓN — helpers ── */
 function semanaKey(fechaStr){
@@ -217,6 +223,8 @@ const esCCNBM = () => rolUsuario() === ROL.CCNBM;
 const soloAccionesLimitadas = () => SOLO_VER || esCCNBM();
 const puedeExportar    = () => esSup() || esCCNBM();
 const puedeCategorizar = () => esSup() || esCCNBM();
+/* Conteo cíclico: solo operadores y admin (ni supervisor ni CCN BM) */
+const puedeCiclico     = () => !SOLO_VER && (esAdmin() || rolUsuario()===ROL.OP);
 
 /* =====================================================================
    USUARIOS
@@ -227,6 +235,8 @@ function pintarUsuario(){
   $('#usuario-chip').textContent = lbl;
   const navCat = $('#nav-categorias');
   if(navCat) navCat.style.display = puedeCategorizar() ? '' : 'none';
+  const navCic = $('#nav-ciclico');
+  if(navCic) navCic.style.display = puedeCiclico() ? '' : 'none';
 }
 function pedirUsuario(){
   if(SOLO_VER) return;
@@ -369,13 +379,14 @@ async function cargar(mostrar=true){
       desde += BLOQUE;
     }
 
-    D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[] };
+    D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[], ciclicos:[] };
     for(const fila of todas){
       if(fila.col==='nucleo')        D.nucleos.push(fila.data);
       else if(fila.col==='parte')    D.partes.push(fila.data);
       else if(fila.col==='mov')      D.movs.push(fila.data);
       else if(fila.col==='usuario')  D.usuarios.push(fila.data);
       else if(fila.col==='categoria') D.categorias.push(fila.data);
+      else if(fila.col==='ciclico')  D.ciclicos.push(fila.data);
     }
     /* Ordenar partes/núcleos de más nuevo a más viejo numéricamente */
     const numId = id => parseInt((id||'').replace(/[^0-9]/g,'').slice(-6)||'0', 10);
@@ -809,6 +820,7 @@ function renderVista(){
   /* Si cambia de usuario en el mismo dispositivo y el que entra no es
      supervisor/admin, sacarlo de la pestaña de Categorías. */
   if(tab==='categorias' && !puedeCategorizar()){ tab='nucleos'; marcarTab(); }
+  if(tab==='ciclico' && !puedeCiclico()){ tab='nucleos'; marcarTab(); }
   const v = $('#vista');
   /* Habilita el layout de columnas para PC solo en las pestañas que son
      listas de tarjetas — ver css/styles.css @media (min-width:900px). */
@@ -1224,7 +1236,246 @@ function renderVista(){
       ${filasNucleos.length ? filasNucleos.map(filaCategoria).join('') : `<div class="vacio">Sin núcleos disponibles para categorizar.</div>`}
     `;
   }
+
+  else if(tab==='ciclico'){
+    if(!puedeCiclico()){
+      v.innerHTML = `<div class="vacio"><b>Sin acceso</b>Esta sección es solo para operadores y administradores.</div>`;
+      return;
+    }
+
+    if(!cicloActivo){
+      const abierto = D.ciclicos.find(s=>s.estado==='abierto' && s.resp===(USUARIO?USUARIO.nombre:''));
+      if(abierto) cicloActivo = abierto.id;
+    }
+    const sesion = cicloActivo ? D.ciclicos.find(s=>s.id===cicloActivo) : null;
+
+    /* ── Historial (solo admin) ── */
+    if(cicloVista==='historial' && esAdmin()){
+      const sesiones = ordenar(D.ciclicos, { fecha:s=>s.fecha, alfa:s=>s.ubic, correlativo:s=>new Date(s.fecha).getTime()||0 });
+      v.innerHTML = `
+        <div class="seccion-t">📜 Historial de conteos cíclicos</div>
+        <button onclick="volverConteoCiclico()" style="margin-bottom:10px;padding:8px 14px;background:transparent;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-weight:700;cursor:pointer">← Volver al conteo</button>
+        ${sesiones.length ? sesiones.map(filaHistorialCiclico).join('') : `<div class="vacio"><b>Sin conteos todavía</b></div>`}`;
+      return;
+    }
+
+    const btnHistorial = esAdmin()
+      ? `<button onclick="verHistorialCiclico()" style="margin-top:14px;width:100%;padding:11px;background:transparent;border:1.5px dashed #4A4F55;color:#4A4F55;border-radius:8px;font-weight:700;cursor:pointer">📜 Ver historial de todos los conteos</button>`
+      : '';
+
+    /* ── Sin sesión activa: formulario para iniciar un conteo ── */
+    if(!sesion){
+      v.innerHTML = `
+        <div class="seccion-t">🔄 Conteo cíclico</div>
+        <div class="aviso-morado">Elige qué vas a contar y la ubicación. El sistema te mostrará lo que debería haber ahí; escribe o escanea cada código y te dirá si está correcto, si falta o si está en otra ubicación.</div>
+        <label>¿Qué vas a contar?</label>
+        <select id="cic-tipo">
+          <option value="nucleo">Núcleos</option>
+          <option value="parte">Partes</option>
+        </select>
+        <label>Ubicación</label>
+        <input id="cic-ubic" list="dl-ubic" placeholder="Ej: TALLER ZAPOTAL, A20…">
+        <button class="guardar" onclick="iniciarCiclico()">▶ Iniciar conteo</button>
+        ${btnHistorial}`;
+      return;
+    }
+
+    /* ── Sesión activa: pantalla de escaneo ── */
+    const confirmados = sesion.esperados.filter(id=>sesion.resultados[id]?.estado==='confirmado').length;
+    const pendientes  = sesion.esperados.filter(id=>!sesion.resultados[id]).length;
+    const extras = Object.keys(sesion.resultados).filter(id=>!sesion.esperados.includes(id));
+    const irregulares = sesion.esperados.filter(id=>['reubicado','reportado'].includes(sesion.resultados[id]?.estado)).length
+                       + extras.filter(id=>['reubicado','reportado','no_registrado'].includes(sesion.resultados[id].estado)).length;
+    const labelTipo = sesion.tipo==='nucleo' ? 'núcleo' : 'parte';
+
+    v.innerHTML = `
+      <div class="seccion-t">🔄 Conteo en curso — ${sesion.tipo==='nucleo'?'Núcleos':'Partes'} · ${esc(sesion.ubic)}</div>
+      <div class="meta">Iniciado ${esc(sesion.fecha)} por 👤 ${esc(sesion.resp)}</div>
+
+      <div class="kpis" style="margin:10px 0">
+        <div class="kpi"><div class="num">${confirmados}</div><div class="lbl">Confirmados</div></div>
+        <div class="kpi n2"><div class="num">${pendientes}</div><div class="lbl">Pendientes</div></div>
+        <div class="kpi n3"><div class="num">${irregulares}</div><div class="lbl">Irregularidades</div></div>
+      </div>
+
+      ${cicloIrregularidad ? `
+      <div style="background:#FFF4E2;border:1.5px solid #E8B36A;border-radius:10px;padding:14px;margin:12px 0">
+        <b style="color:#6B4A12">⚠ ${esc(cicloIrregularidad.codigo)}</b> está registrado en <b>${esc(cicloIrregularidad.ubicActual)}</b>, no en <b>${esc(sesion.ubic)}</b>.
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button onclick="corregirIrregularidadCiclico()" style="flex:1;padding:10px;background:var(--azul);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">📍 Corregir (mover aquí)</button>
+          <button onclick="reportarIrregularidadCiclico()" style="flex:1;padding:10px;background:transparent;border:1.5px solid #6B4A12;color:#6B4A12;border-radius:8px;font-weight:700;cursor:pointer">📝 Solo reportar</button>
+        </div>
+        <button onclick="cancelarIrregularidadCiclico()" style="width:100%;margin-top:8px;padding:8px;background:transparent;border:none;color:#8A8F96;font-size:12px;cursor:pointer">✕ Cancelar (error de escaneo)</button>
+      </div>` : ''}
+
+      ${cicloUltimo && !cicloIrregularidad ? `<div class="cic-msg cic-msg-${cicloUltimo.estado}">${mensajeCicloUltimo(cicloUltimo)}</div>` : ''}
+
+      <label>Código de ${labelTipo}</label>
+      <div style="display:flex;gap:8px">
+        <input id="cic-input" placeholder="Escribe o escanea el código…" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();escanearCiclico();}" style="flex:1">
+        <button onclick="escanearCiclico()" style="padding:0 18px;background:var(--azul);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Verificar</button>
+      </div>
+
+      <div class="seccion-t">Lista esperada en esta ubicación (${sesion.esperados.length})</div>
+      ${sesion.esperados.length ? sesion.esperados.map(id=>filaCiclico(id, sesion)).join('') : `<div class="vacio">No hay nada registrado en esta ubicación todavía.</div>`}
+
+      ${extras.length ? `<div class="seccion-t">Códigos adicionales escaneados</div>${extras.map(id=>filaCiclico(id, sesion)).join('')}` : ''}
+
+      <button class="guardar" style="background:var(--rojo);margin-top:16px" onclick="cerrarCiclico()">■ Cerrar conteo</button>`;
+  }
 }
+
+/* =====================================================================
+   CONTEO CÍCLICO
+   ===================================================================== */
+function listaCiclico(tipo){ return tipo==='nucleo' ? D.nucleos : D.partes; }
+function itemDisponibleCiclico(item, tipo){
+  if(tipo==='nucleo') return !['Vendido - Re-manufactura','Vendido - Consignación'].includes(item.zona);
+  return item.venta!=='Vendido';
+}
+function filaCiclico(id, sesion){
+  const r = sesion.resultados[id];
+  const estado = r ? r.estado : 'pendiente';
+  const pills = {
+    pendiente:     { cls:'cic-pend', txt:'PENDIENTE' },
+    confirmado:    { cls:'cic-ok',   txt:'✓ CONFIRMADO' },
+    faltante:      { cls:'cic-falt', txt:'✕ FALTANTE' },
+    reubicado:     { cls:'cic-reub', txt:'📍 REUBICADO' },
+    reportado:     { cls:'cic-rep',  txt:'⚠ REPORTADO' },
+    no_registrado: { cls:'cic-norg', txt:'❌ NO REGISTRADO' }
+  };
+  const p = pills[estado] || pills.pendiente;
+  return `<div class="cic-fila">
+    <span class="id">${esc(id)}</span>
+    <span class="cic-pill ${p.cls}">${p.txt}</span>
+  </div>`;
+}
+function mensajeCicloUltimo(u){
+  const map = {
+    confirmado:    `✓ ${esc(u.id)} confirmado en esta ubicación.`,
+    no_registrado: `❌ ${esc(u.id)} no está registrado en el sistema.`,
+    reubicado:     `📍 ${esc(u.id)} reubicado — estaba en ${esc(u.ubicActual)}.`,
+    reportado:     `⚠ ${esc(u.id)} reportado — estaba en ${esc(u.ubicActual)}.`
+  };
+  return map[u.estado] || '';
+}
+function filaHistorialCiclico(s){
+  const total = s.esperados.length;
+  const todasClaves = Object.keys(s.resultados);
+  const confirmados = s.esperados.filter(id=>s.resultados[id]?.estado==='confirmado').length;
+  const faltantes   = s.esperados.filter(id=>s.resultados[id]?.estado==='faltante').length;
+  const reubicados  = todasClaves.filter(id=>s.resultados[id].estado==='reubicado').length;
+  const reportados  = todasClaves.filter(id=>s.resultados[id].estado==='reportado').length;
+  const cumpTxt = s.estado==='abierto' ? 'EN CURSO' : (s.cumplimiento!=null ? s.cumplimiento.toFixed(1)+'%' : '—');
+  const cumpCls = s.estado==='abierto' ? 'cic-pend' : (s.cumplimiento>=90 ? 'cic-ok' : s.cumplimiento>=70 ? 'cic-reub' : 'cic-falt');
+  return `<div class="cic-hist-fila">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <b>${esc(s.ubic)} · ${s.tipo==='nucleo'?'Núcleos':'Partes'}</b>
+      <span class="cic-pill ${cumpCls}">${cumpTxt}</span>
+    </div>
+    <div class="meta">${esc(s.fecha)}${s.fechaCierre?' → '+esc(s.fechaCierre):''} · 👤 ${esc(s.resp)}</div>
+    <div class="meta">${total} esperados · ${confirmados} confirmados · ${faltantes} faltantes · ${reubicados} reubicados · ${reportados} reportados</div>
+  </div>`;
+}
+async function iniciarCiclico(){
+  const tipo = $('#cic-tipo').value;
+  const ubic = mayus($('#cic-ubic').value.trim());
+  if(!ubic){ alert('Elige o escribe una ubicación.'); return; }
+  const lista = listaCiclico(tipo);
+  const esperados = lista.filter(it=>itemDisponibleCiclico(it,tipo) && mayus(it.ubic||'')===ubic).map(it=>it.id);
+  const sesion = {
+    id: 'CIC-'+Date.now()+'-'+Math.floor(Math.random()*9999),
+    tipo, ubic, fecha: hoy(), resp: USUARIO ? USUARIO.nombre : '',
+    estado: 'abierto', fechaCierre: '',
+    esperados, resultados: {}, cumplimiento: null
+  };
+  D.ciclicos.unshift(sesion);
+  await persistir('ciclico', sesion);
+  cicloActivo = sesion.id; cicloIrregularidad = null; cicloUltimo = null;
+  render();
+}
+function escanearCiclico(){
+  const el = $('#cic-input'); if(!el) return;
+  const codigo = mayus(el.value.trim());
+  if(!codigo) return;
+  procesarEscaneoCiclico(codigo);
+  el.value = ''; el.focus();
+}
+async function procesarEscaneoCiclico(codigo){
+  const sesion = D.ciclicos.find(s=>s.id===cicloActivo);
+  if(!sesion) return;
+  const lista = listaCiclico(sesion.tipo);
+  const item = lista.find(it=>mayus(it.id)===codigo);
+  if(!item){
+    sesion.resultados[codigo] = { estado:'no_registrado', ubicOriginal:'', notas:'', fecha:new Date().toISOString() };
+    cicloUltimo = { id:codigo, estado:'no_registrado' };
+    await persistir('ciclico', sesion);
+    render();
+    return;
+  }
+  const ubicItem = mayus(item.ubic||'');
+  if(ubicItem === sesion.ubic){
+    sesion.resultados[item.id] = { estado:'confirmado', ubicOriginal:ubicItem, notas:'', fecha:new Date().toISOString() };
+    cicloUltimo = { id:item.id, estado:'confirmado' };
+    await persistir('ciclico', sesion);
+    render();
+  } else {
+    cicloIrregularidad = { codigo:item.id, ubicActual:ubicItem };
+    render();
+  }
+}
+async function corregirIrregularidadCiclico(){
+  const sesion = D.ciclicos.find(s=>s.id===cicloActivo);
+  if(!sesion || !cicloIrregularidad) return;
+  const { codigo, ubicActual } = cicloIrregularidad;
+  const lista = listaCiclico(sesion.tipo);
+  const item = lista.find(it=>it.id===codigo);
+  if(item){
+    const ubicOriginal = item.ubic;
+    item.ubic = sesion.ubic;
+    await persistir(sesion.tipo, item);
+    mov(item.id, ubicOriginal, sesion.ubic, 'Conteo cíclico — ubicación corregida');
+  }
+  sesion.resultados[codigo] = { estado:'reubicado', ubicOriginal:ubicActual, notas:'', fecha:new Date().toISOString() };
+  cicloUltimo = { id:codigo, estado:'reubicado', ubicActual };
+  await persistir('ciclico', sesion);
+  cicloIrregularidad = null;
+  render();
+}
+async function reportarIrregularidadCiclico(){
+  const sesion = D.ciclicos.find(s=>s.id===cicloActivo);
+  if(!sesion || !cicloIrregularidad) return;
+  const { codigo, ubicActual } = cicloIrregularidad;
+  const nota = prompt('Nota (opcional) sobre esta irregularidad:') || '';
+  sesion.resultados[codigo] = { estado:'reportado', ubicOriginal:ubicActual, notas:nota, fecha:new Date().toISOString() };
+  cicloUltimo = { id:codigo, estado:'reportado', ubicActual };
+  await persistir('ciclico', sesion);
+  cicloIrregularidad = null;
+  render();
+}
+function cancelarIrregularidadCiclico(){ cicloIrregularidad = null; render(); }
+async function cerrarCiclico(){
+  const sesion = D.ciclicos.find(s=>s.id===cicloActivo);
+  if(!sesion) return;
+  pedirConfirm(
+    '¿Cerrar conteo?',
+    'Lo que no se haya escaneado quedará marcado como faltante. Esta acción no se puede deshacer.',
+    async ()=>{
+      sesion.esperados.forEach(id=>{
+        if(!sesion.resultados[id]) sesion.resultados[id] = { estado:'faltante', ubicOriginal:sesion.ubic, notas:'', fecha:new Date().toISOString() };
+      });
+      const confirmados = sesion.esperados.filter(id=>sesion.resultados[id]?.estado==='confirmado').length;
+      sesion.cumplimiento = sesion.esperados.length ? (confirmados/sesion.esperados.length*100) : 100;
+      sesion.estado = 'cerrado';
+      sesion.fechaCierre = hoy();
+      await persistir('ciclico', sesion);
+      cicloActivo = null; cicloIrregularidad = null; cicloUltimo = null;
+      render();
+    }
+  );
+}
+function verHistorialCiclico(){ cicloVista = 'historial'; render(); }
+function volverConteoCiclico(){ cicloVista = 'conteo'; render(); }
 
 /* =====================================================================
    FORMULARIOS — helpers
