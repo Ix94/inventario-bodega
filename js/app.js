@@ -23,6 +23,13 @@ let cicloUltimo = null;         // último resultado escaneado, para feedback in
 let cicloPrefijoNucleo = 'TR';  // 'TR' | 'DF' — prefijo activo al contar núcleos
 let cicloDetalle = null;        // id de la sesión (D.ciclicos) que se está viendo en detalle
 
+/* ── EDICIÓN MASIVA — estado de la herramienta en este dispositivo ── */
+let masTab = 'campos';          // 'campos' | 'consignacion'
+let masModoCampos = 'filtro';   // 'filtro' | 'lista'
+let masModoConsig = 'filtro';   // 'filtro' | 'lista'
+let masPreviewCampos = null;    // resultado de "Buscar"/"Previsualizar" en Editar campos
+let masPreviewConsig = null;    // resultado de "Buscar"/"Previsualizar" en Enviar a consignación
+
 /* ── CONSIGNACIÓN — helpers ── */
 function semanaKey(fechaStr){
   /* Devuelve "YYYY-Www" de la fecha dada, o de hoy si no hay fecha */
@@ -226,6 +233,8 @@ const puedeExportar    = () => esSup() || esCCNBM();
 const puedeCategorizar = () => esSup() || esCCNBM();
 /* Conteo cíclico: solo operadores y admin (ni supervisor ni CCN BM) */
 const puedeCiclico     = () => !SOLO_VER && (esAdmin() || rolUsuario()===ROL.OP);
+/* Edición masiva: solo supervisor y admin */
+const puedeEdicionMasiva = () => esSup();
 
 /* =====================================================================
    USUARIOS
@@ -238,6 +247,8 @@ function pintarUsuario(){
   if(navCat) navCat.style.display = puedeCategorizar() ? '' : 'none';
   const navCic = $('#nav-ciclico');
   if(navCic) navCic.style.display = puedeCiclico() ? '' : 'none';
+  const navMas = $('#nav-masiva');
+  if(navMas) navMas.style.display = puedeEdicionMasiva() ? '' : 'none';
 }
 function pedirUsuario(){
   if(SOLO_VER) return;
@@ -822,6 +833,7 @@ function renderVista(){
      supervisor/admin, sacarlo de la pestaña de Categorías. */
   if(tab==='categorias' && !puedeCategorizar()){ tab='nucleos'; marcarTab(); }
   if(tab==='ciclico' && !puedeCiclico()){ tab='nucleos'; marcarTab(); }
+  if(tab==='masiva' && !puedeEdicionMasiva()){ tab='nucleos'; marcarTab(); }
   const v = $('#vista');
   /* Habilita el layout de columnas para PC solo en las pestañas que son
      listas de tarjetas — ver css/styles.css @media (min-width:900px). */
@@ -1352,6 +1364,322 @@ function renderVista(){
         <button onclick="cerrarCiclico()" style="flex:1;padding:12px 6px;background:var(--rojo);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✓ Finalizar</button>
       </div>`;
   }
+
+  else if(tab==='masiva'){
+    if(!puedeEdicionMasiva()){
+      v.innerHTML = `<div class="vacio"><b>Sin acceso</b>Esta sección es solo para supervisores y administradores.</div>`;
+      return;
+    }
+    const subnav = `
+      <div class="cons-tabs">
+        <button class="cons-tab${masTab==='campos'?' on':''}" onclick="masTab='campos';masPreviewCampos=null;render()">Editar campos</button>
+        <button class="cons-tab${masTab==='consignacion'?' on':''}" onclick="masTab='consignacion';masPreviewConsig=null;render()">Enviar a consignación</button>
+      </div>`;
+
+    if(masTab==='campos'){
+      v.innerHTML = `
+        <div class="seccion-t">🧰 Edición masiva</div>
+        ${subnav}
+        <div class="aviso-morado">Cambia ubicación, tipo y/o características a muchos registros de una vez. Deja en blanco lo que NO quieras cambiar.</div>
+        <div class="fila-filtro">
+          <button class="filtro-btn${masModoCampos==='filtro'?' on':''}" onclick="masModoCampos='filtro';masPreviewCampos=null;render()">Por filtro</button>
+          <button class="filtro-btn${masModoCampos==='lista'?' on':''}" onclick="masModoCampos='lista';masPreviewCampos=null;render()">Pegar / subir lista</button>
+        </div>
+        ${masModoCampos==='filtro' ? masVistaCamposFiltro() : masVistaCamposLista()}`;
+      return;
+    }
+
+    v.innerHTML = `
+      <div class="seccion-t">🧰 Edición masiva</div>
+      ${subnav}
+      <div class="aviso-morado">Envía varios núcleos o partes a consignación de una vez — sigue el mismo proceso que hacerlo uno por uno (ubicación, fecha, semana y movimiento quedan registrados igual).</div>
+      <div class="fila-filtro">
+        <button class="filtro-btn${masModoConsig==='filtro'?' on':''}" onclick="masModoConsig='filtro';masPreviewConsig=null;render()">Por filtro</button>
+        <button class="filtro-btn${masModoConsig==='lista'?' on':''}" onclick="masModoConsig='lista';masPreviewConsig=null;render()">Pegar / subir lista de IDs</button>
+      </div>
+      ${masModoConsig==='filtro' ? masVistaConsigFiltro() : masVistaConsigLista()}`;
+  }
+}
+
+/* =====================================================================
+   EDICIÓN MASIVA
+   ===================================================================== */
+function resolverItemPorId(id){
+  let item = D.nucleos.find(x=>x.id===id);
+  if(item) return { item, col:'nucleo' };
+  item = D.partes.find(x=>x.id===id);
+  if(item) return { item, col:'parte' };
+  return null;
+}
+/* Lee texto pegado (o volcado desde un Excel) con columnas
+   ID, Tipo, ubic, Car1.N, Car1.V, Car2.N, Car2.V … — separadas por
+   tabulador (o coma si no hay tabuladores). Celda vacía = no cambia. */
+function parsearFilasMasivas(texto){
+  const lineas = String(texto||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const filas = [];
+  for(const linea of lineas){
+    const celdas = linea.includes('\t') ? linea.split('\t') : linea.split(',');
+    const id = (celdas[0]||'').trim().toUpperCase();
+    if(!id || id==='ID') continue; // salta encabezado
+    const tipo = (celdas[1]||'').trim().toUpperCase();
+    const ubic = (celdas[2]||'').trim().toUpperCase();
+    const cars = [];
+    for(let slot=0; slot<5; slot++){
+      const n = (celdas[3+slot*2]||'').trim().toUpperCase();
+      const v = (celdas[4+slot*2]||'').trim().toUpperCase();
+      if(n||v) cars.push({slot, n, v});
+    }
+    filas.push({ id, tipo, ubic, cars });
+  }
+  return filas;
+}
+/* Vuelca un .xlsx subido a texto separado por tabulador, usando la misma
+   librería (SheetJS) que ya carga index.html para exportar. */
+function masLeerExcelGenerico(input, cb){
+  if(!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(hoja, {header:1, raw:false, defval:''});
+      cb(filas.map(f=>f.join('\t')).join('\n'));
+    }catch(err){ alert('No se pudo leer el archivo. Verifica que sea un Excel válido.'); }
+  };
+  reader.readAsArrayBuffer(input.files[0]);
+}
+
+/* ── Editar campos ── */
+function masVistaCamposFiltro(){
+  const p = masPreviewCampos;
+  return `
+    <label>Tipo de registro</label>
+    <select id="mcf-tipo">
+      <option value="parte">Partes</option>
+      <option value="nucleo">Núcleos</option>
+    </select>
+    <label>Ubicación actual (opcional)</label>
+    <input id="mcf-ubic" list="dl-ubic" placeholder="Ej: P14A">
+    <label>Texto en el tipo de pieza (opcional)</label>
+    <input id="mcf-texto" placeholder="Ej: ENGRANE">
+    <button class="guardar" style="background:var(--azul)" onclick="masBuscarCampos()">🔍 Buscar coincidencias</button>
+    ${p && p.modo==='filtro' ? `
+      <div class="aviso">${p.items.length} registro${p.items.length!==1?'s':''} encontrado${p.items.length!==1?'s':''}.</div>
+      ${p.items.length ? `
+        <label>Nueva ubicación (vacío = no cambia)</label>
+        <input id="mcn-ubic" list="dl-ubic">
+        <label>Nuevo tipo (vacío = no cambia)</label>
+        <input id="mcn-tipo">
+        <div class="carbloque"><div class="titulo">Característica 1 (vacío = no cambia)</div>
+          <div class="carfila">
+            <input id="mcn-cn0" placeholder="NOMBRE">
+            <input id="mcn-cv0" placeholder="VALOR">
+          </div>
+        </div>
+        <div class="meta" style="margin-top:6px">¿Necesitas cambiar más de una característica? Usa "Pegar / subir lista".</div>
+        <button class="guardar" style="background:var(--rojo)" onclick="masConfirmarCampos()">✓ Aplicar a ${p.items.length} registro${p.items.length!==1?'s':''}</button>
+      ` : ''}
+    ` : ''}`;
+}
+function masBuscarCampos(){
+  const tipo = $('#mcf-tipo').value;
+  const ubic = mayus($('#mcf-ubic').value.trim());
+  const texto = mayus($('#mcf-texto').value.trim());
+  const lista = tipo==='nucleo' ? D.nucleos : D.partes;
+  const items = lista.filter(it=>{
+    if(ubic && mayus(it.ubic||'')!==ubic) return false;
+    if(texto && !mayus(it.tipo||'').includes(texto)) return false;
+    return true;
+  }).map(it=>({id:it.id, col:tipo}));
+  masPreviewCampos = { modo:'filtro', items };
+  render();
+}
+async function masConfirmarCampos(){
+  const p = masPreviewCampos;
+  if(!p || p.modo!=='filtro' || !p.items.length) return;
+  const nuevaUbic = mayus($('#mcn-ubic').value.trim());
+  const nuevoTipo = mayus($('#mcn-tipo').value.trim());
+  const cn0 = mayus($('#mcn-cn0').value.trim());
+  const cv0 = mayus($('#mcn-cv0').value.trim());
+  if(!nuevaUbic && !nuevoTipo && !cn0 && !cv0){ alert('No escribiste ningún cambio.'); return; }
+  pedirConfirm(
+    `¿Aplicar a ${p.items.length} registros?`,
+    'Esta acción no se puede deshacer automáticamente.',
+    async ()=>{
+      for(const {id, col} of p.items){
+        const lista = col==='nucleo' ? D.nucleos : D.partes;
+        const item = lista.find(x=>x.id===id); if(!item) continue;
+        if(nuevaUbic) item.ubic = nuevaUbic;
+        if(nuevoTipo) item.tipo = nuevoTipo;
+        if(cn0 || cv0){
+          if(!item.cars) item.cars = [];
+          while(item.cars.length<1) item.cars.push({n:'',v:''});
+          item.cars[0] = { n: cn0||item.cars[0]?.n||'', v: cv0||item.cars[0]?.v||'' };
+        }
+        await persistir(col, item);
+      }
+      masPreviewCampos = null;
+      alert('Listo. Se actualizaron ' + p.items.length + ' registros.');
+      render();
+    }
+  );
+}
+function masVistaCamposLista(){
+  const p = masPreviewCampos;
+  return `
+    <label>Pega la lista (columnas: ID, Tipo, ubic, Car1.N, Car1.V, Car2.N, Car2.V…) — celda vacía = no cambia</label>
+    <textarea id="mcl-texto" rows="8" placeholder="ID	Tipo	ubic	Car1.N	Car1.V
+PRT-0001	ENGRANE USADO	P14A	# PARTE	U-1234"></textarea>
+    <label>…o sube un archivo Excel (.xlsx) con esas mismas columnas</label>
+    <input type="file" id="mcl-archivo" accept=".xlsx,.xls" onchange="masLeerExcelGenerico(this, t=>{$('#mcl-texto').value=t})">
+    <button class="guardar" style="background:var(--azul)" onclick="masPrevisualizarListaCampos()">👁 Previsualizar</button>
+    ${p && p.modo==='lista' ? `
+      <div class="aviso">${p.filas.filter(f=>f.encontrado).length} de ${p.filas.length} encontrados.
+        ${p.filas.some(f=>!f.encontrado) ? ' Los no encontrados se omitirán.' : ''}</div>
+      <div style="max-height:260px;overflow-y:auto">
+        ${p.filas.slice(0,150).map(f=>`<div class="cic-fila">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="id">${esc(f.id)}</span>
+            <span class="cic-pill ${f.encontrado?'cic-ok':'cic-falt'}">${f.encontrado?'✓ ENCONTRADO':'✕ NO ENCONTRADO'}</span>
+          </div>
+        </div>`).join('')}
+      </div>
+      ${p.filas.filter(f=>f.encontrado).length ? `<button class="guardar" style="background:var(--rojo)" onclick="masConfirmarLista()">✓ Aplicar a ${p.filas.filter(f=>f.encontrado).length} registros</button>` : ''}
+    ` : ''}`;
+}
+function masPrevisualizarListaCampos(){
+  const filas = parsearFilasMasivas($('#mcl-texto').value).map(f=>{
+    const res = resolverItemPorId(f.id);
+    return { ...f, encontrado: !!res, col: res?res.col:null };
+  });
+  masPreviewCampos = { modo:'lista', filas };
+  render();
+}
+async function masConfirmarLista(){
+  const p = masPreviewCampos;
+  if(!p || p.modo!=='lista') return;
+  const encontrados = p.filas.filter(f=>f.encontrado);
+  if(!encontrados.length) return;
+  pedirConfirm(
+    `¿Aplicar a ${encontrados.length} registros?`,
+    'Esta acción no se puede deshacer automáticamente.',
+    async ()=>{
+      for(const f of encontrados){
+        const lista = f.col==='nucleo' ? D.nucleos : D.partes;
+        const item = lista.find(x=>x.id===f.id); if(!item) continue;
+        if(f.tipo) item.tipo = f.tipo;
+        if(f.ubic) item.ubic = f.ubic;
+        if(f.cars.length){
+          if(!item.cars) item.cars = [];
+          f.cars.forEach(({slot,n,v})=>{
+            while(item.cars.length<=slot) item.cars.push({n:'',v:''});
+            item.cars[slot] = { n, v };
+          });
+        }
+        await persistir(f.col, item);
+      }
+      masPreviewCampos = null;
+      alert('Listo. Se actualizaron ' + encontrados.length + ' registros.');
+      render();
+    }
+  );
+}
+
+/* ── Enviar a consignación en lote ──
+   Replica exactamente confirmarMoverAConsig() (consig, ubic, zona,
+   movimiento) para cada ítem seleccionado — misma lógica, varias veces. */
+function masBloqueConfirmConsig(p){
+  return `
+    <div class="aviso">${p.items.length} encontrado${p.items.length!==1?'s':''} para enviar.
+      ${p.omitidos.length?` ${p.omitidos.length} omitido${p.omitidos.length!==1?'s':''} (ya estaban en consignación o no se encontraron).`:''}</div>
+    ${p.items.length ? `
+      <label>Fecha de envío (para todo el lote)</label>
+      <input type="datetime-local" id="msc-fecha" value="${ahoraLocal()}">
+      <label>Notas (opcional, para todo el lote)</label>
+      <textarea id="msc-notas" rows="2" placeholder="LOTE, REFERENCIA DE REMISIÓN…"></textarea>
+      <button class="guardar" style="background:var(--verde-cons)" onclick="masConfirmarConsig()">🏪 Enviar ${p.items.length} a consignación</button>
+    ` : ''}`;
+}
+function masVistaConsigFiltro(){
+  const p = masPreviewConsig;
+  return `
+    <label>Tipo de registro</label>
+    <select id="mscf-tipo">
+      <option value="parte">Partes</option>
+      <option value="nucleo">Núcleos</option>
+    </select>
+    <label>Ubicación actual (opcional)</label>
+    <input id="mscf-ubic" list="dl-ubic">
+    <label>Texto en el tipo de pieza (opcional)</label>
+    <input id="mscf-texto" placeholder="Ej: ENGRANE">
+    <button class="guardar" style="background:var(--azul)" onclick="masBuscarConsig()">🔍 Buscar coincidencias</button>
+    ${p && p.modo==='filtro' ? masBloqueConfirmConsig(p) : ''}`;
+}
+function masBuscarConsig(){
+  const tipo = $('#mscf-tipo').value;
+  const ubic = mayus($('#mscf-ubic').value.trim());
+  const texto = mayus($('#mscf-texto').value.trim());
+  const lista = tipo==='nucleo' ? D.nucleos : D.partes;
+  const items = [], omitidos = [];
+  lista.forEach(it=>{
+    if(ubic && mayus(it.ubic||'')!==ubic) return;
+    if(texto && !mayus(it.tipo||'').includes(texto)) return;
+    if(enConsignacion(it)){ omitidos.push(it.id); return; }
+    items.push({ id: it.id, col: tipo });
+  });
+  masPreviewConsig = { modo:'filtro', items, omitidos };
+  render();
+}
+function masVistaConsigLista(){
+  const p = masPreviewConsig;
+  return `
+    <label>Pega los IDs (uno por línea o separados por coma), o sube un Excel con una columna de IDs</label>
+    <textarea id="mscl-texto" rows="6" placeholder="PRT-0001
+PRT-0002
+TR-2026-08-0010"></textarea>
+    <label>…o sube un archivo Excel (.xlsx)</label>
+    <input type="file" id="mscl-archivo" accept=".xlsx,.xls" onchange="masLeerExcelGenerico(this, t=>{$('#mscl-texto').value=t})">
+    <button class="guardar" style="background:var(--azul)" onclick="masPrevisualizarListaConsig()">👁 Previsualizar</button>
+    ${p && p.modo==='lista' ? masBloqueConfirmConsig(p) : ''}`;
+}
+function masPrevisualizarListaConsig(){
+  const texto = $('#mscl-texto').value;
+  const ids = [...new Set(String(texto||'').split(/[\n,\t]/).map(s=>mayus(s.trim())).filter(Boolean))].filter(id=>id!=='ID');
+  const items = [], omitidos = [];
+  ids.forEach(id=>{
+    const res = resolverItemPorId(id);
+    if(!res){ omitidos.push(id); return; }
+    if(enConsignacion(res.item)){ omitidos.push(id); return; }
+    items.push({ id, col: res.col });
+  });
+  masPreviewConsig = { modo:'lista', items, omitidos };
+  render();
+}
+async function masConfirmarConsig(){
+  const p = masPreviewConsig;
+  if(!p || !p.items.length) return;
+  const fechaVal = $('#msc-fecha').value || ahoraLocal();
+  const fecha = fechaVal.slice(0,10);
+  const notas = mayus($('#msc-notas').value.trim());
+  pedirConfirm(
+    `¿Enviar ${p.items.length} a consignación?`,
+    'Cada uno quedará registrado con la fecha, semana y movimiento correspondientes — igual que hacerlo uno por uno.',
+    async ()=>{
+      for(const {id, col} of p.items){
+        const lista = col==='nucleo' ? D.nucleos : D.partes;
+        const item = lista.find(x=>x.id===id); if(!item || enConsignacion(item)) continue;
+        const ubicAnt = item.ubic;
+        item.consig = { activo:true, fechaEnvio:fecha, semana:semanaKey(fecha), notas, resp: USUARIO?USUARIO.nombre:'' };
+        item.ubic = 'BODEGA CONSIGNACION';
+        if(col==='nucleo') item.zona = 'Consignación';
+        await persistir(col, item);
+        mov(id, ubicAnt, 'BODEGA CONSIGNACION', 'ENVIADO A CONSIGNACIÓN (LOTE)'+(notas?' — '+notas:''), fecha);
+      }
+      masPreviewConsig = null;
+      alert('Listo. Se enviaron ' + p.items.length + ' a consignación.');
+      render(); pintarUbic();
+    }
+  );
 }
 
 /* =====================================================================
