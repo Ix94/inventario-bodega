@@ -23,6 +23,15 @@
   #search::placeholder{color:#8A8F96;text-transform:none}
   #recargar{border:none;background:#31363D;color:var(--amarillo);border-radius:var(--radius);width:44px;font-size:18px;cursor:pointer}
 
+  /* ── SUB-NAVEGACIÓN (pestañas de la página activa) ── */
+  #subnav-wrap{background:#14171B}
+  .subnav{display:flex;overflow-x:auto;gap:6px;padding:8px 14px}
+  .subnav-btn{flex:0 0 auto;display:flex;align-items:center;gap:5px;background:#31363D;color:#9AA0A8;
+    border:1.5px solid #3C4148;border-radius:20px;padding:6px 14px;font:inherit;font-size:12px;font-weight:600;
+    letter-spacing:.05em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+  .subnav-btn .ic{font-size:14px}
+  .subnav-btn.on{background:var(--azul);color:#fff;border-color:var(--azul)}
+
   /* ── FILTROS ── */
   #filtros-wrap{background:#1C2026;padding:8px 14px 10px;display:flex;flex-direction:column;gap:6px}
   .fila-filtro{display:flex;gap:6px;flex-wrap:wrap}
@@ -194,6 +203,13 @@
   .cat-btn.cat-c.on{background:var(--rojo);color:#fff;border-color:var(--rojo)}
   .cat-fila{display:flex;justify-content:space-between;align-items:center;background:#fff;
     border-radius:10px;padding:10px 12px;margin-bottom:8px;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  /* ── PIVOT DE INVENTARIO ── */
+  .pivot-grupo{margin-bottom:4px}
+  .pivot-fila{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;font-size:13px}
+  .pivot-n1{background:#fff;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08);margin-bottom:2px;cursor:pointer}
+  .pivot-n2{background:#F5F3EF;padding-left:28px;font-weight:500;color:#4A4F55}
+  .pivot-cnt{font-family:'IBM Plex Mono',monospace;font-weight:700}
 
   /* ── CONTEO CÍCLICO ── */
   .cic-fila{background:#fff;border-radius:8px;padding:8px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.06)}

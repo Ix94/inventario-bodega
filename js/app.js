@@ -12,7 +12,7 @@ const UBIC_BASE = ['REC-01','TALLER ZAPOTAL','TRI-01','DSM-01','DSM-02','CMP-01'
 const ROL = { ADMIN:'admin', SUP:'supervisor', OP:'operador', CCNBM:'ccn_bm' };
 const ADMIN_ID = 'USR-ixel-flores';  // fallback mientras el campo rol esté en BD
 
-let D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[], ciclicos:[] };
+let D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[], ciclicos:[], config:{} };
 let tab = 'nucleos', filtro = '', USUARIO = null, fotoPend = null;
 let confirmCallback = null;
 
@@ -29,6 +29,11 @@ let masModoCampos = 'filtro';   // 'filtro' | 'lista'
 let masModoConsig = 'filtro';   // 'filtro' | 'lista'
 let masPreviewCampos = null;    // resultado de "Buscar"/"Previsualizar" en Editar campos
 let masPreviewConsig = null;    // resultado de "Buscar"/"Previsualizar" en Enviar a consignación
+
+/* ── PIVOT DE INVENTARIO ── */
+let pivotCategoria = 'diferencial'; // 'diferencial' | 'transmision' | 'partes'
+let pivotColapsados = new Set();    // índices de grupos de nivel 1 colapsados
+let pivotUltimosGrupos = [];        // último resultado calculado, para el toggle de colapsar
 
 /* ── CONSIGNACIÓN — helpers ── */
 function semanaKey(fechaStr){
@@ -102,6 +107,7 @@ let F = {
   tipo: '',      // 'Transmisión' | 'Diferencial'
   posicion: '',  // 'Delantero' | 'Trasero'
   marca: '',     // 'MERITOR'|'EATON'|'INTERNATIONAL'|'MACK'
+  modelo: '',    // texto libre por modelo de núcleo
   parteTipo: '', // texto libre por tipo de pieza
   car1: '', car2: '', car3: '',
   edad: ''       // ''|'<3m'|'3-6m'|'6-12m'|'>1a'
@@ -237,18 +243,36 @@ const puedeCiclico     = () => !SOLO_VER && (esAdmin() || rolUsuario()===ROL.OP)
 const puedeEdicionMasiva = () => esSup();
 
 /* =====================================================================
+   PÁGINAS DE NAVEGACIÓN — agrupan varias pestañas bajo un solo botón de
+   la barra inferior, para que no quede sobrecargada. Cada pestaña
+   (tab) sigue siendo la misma de siempre; esto solo cambia cómo se
+   llega a ella.
+   ===================================================================== */
+const PAGINAS = {
+  inventario: { label:'Inventario', icon:'📦', tabs:['nucleos','partes','pivot','resumen'] },
+  traslados:  { label:'Traslados',  icon:'🚚', tabs:['remfg','cons','movs'] },
+  funciones:  { label:'Funciones',  icon:'🛠', tabs:['categorias','ciclico','masiva'] }
+};
+/* Si una pestaña requiere un rol concreto para verse, se decide aquí —
+   un solo lugar, en vez de repartir la lógica entre nav y renderVista(). */
+function tabVisible(t){
+  if(t==='categorias') return puedeCategorizar();
+  if(t==='ciclico')    return puedeCiclico();
+  if(t==='masiva')     return puedeEdicionMasiva();
+  return true;
+}
+function paginaVisible(key){ return PAGINAS[key].tabs.some(tabVisible); }
+function paginaDeTab(t){ return Object.keys(PAGINAS).find(k=>PAGINAS[k].tabs.includes(t)) || 'inventario'; }
+
+/* =====================================================================
    USUARIOS
    ===================================================================== */
 function sesion(){ try{ return JSON.parse(localStorage.getItem(SESION)); }catch(e){ return null; } }
 function pintarUsuario(){
   const lbl = SOLO_VER ? '👁 SOLO LECTURA' : ('👤 ' + (USUARIO ? USUARIO.nombre.toUpperCase() : '—'));
   $('#usuario-chip').textContent = lbl;
-  const navCat = $('#nav-categorias');
-  if(navCat) navCat.style.display = puedeCategorizar() ? '' : 'none';
-  const navCic = $('#nav-ciclico');
-  if(navCic) navCic.style.display = puedeCiclico() ? '' : 'none';
-  const navMas = $('#nav-masiva');
-  if(navMas) navMas.style.display = puedeEdicionMasiva() ? '' : 'none';
+  const navFun = $('#nav-funciones');
+  if(navFun) navFun.style.display = paginaVisible('funciones') ? '' : 'none';
 }
 function pedirUsuario(){
   if(SOLO_VER) return;
@@ -391,7 +415,7 @@ async function cargar(mostrar=true){
       desde += BLOQUE;
     }
 
-    D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[], ciclicos:[] };
+    D = { nucleos:[], partes:[], movs:[], usuarios:[], categorias:[], ciclicos:[], config:{} };
     for(const fila of todas){
       if(fila.col==='nucleo')        D.nucleos.push(fila.data);
       else if(fila.col==='parte')    D.partes.push(fila.data);
@@ -399,6 +423,7 @@ async function cargar(mostrar=true){
       else if(fila.col==='usuario')  D.usuarios.push(fila.data);
       else if(fila.col==='categoria') D.categorias.push(fila.data);
       else if(fila.col==='ciclico')  D.ciclicos.push(fila.data);
+      else if(fila.col==='config')  D.config[fila.data.id] = fila.data;
     }
     /* Ordenar partes/núcleos de más nuevo a más viejo numéricamente */
     const numId = id => parseInt((id||'').replace(/[^0-9]/g,'').slice(-6)||'0', 10);
@@ -688,6 +713,7 @@ function coincideNucleo(n){
     if(!cars.some(v=>v.includes(posStr)) && !mayus(n.notas||'').includes(posStr) && mayus(n.posicion||'')!==posStr) return false;
   }
   if(F.marca && !marcaCoincide(n.marca, F.marca)) return false;
+  if(F.modelo && !mayus(n.modelo||'').includes(F.modelo.toUpperCase())) return false;
   if(F.edad && !edadCoincide(n.fecha)) return false;
   if(filtro && !JSON.stringify(n).toUpperCase().includes(filtro)) return false;
   return true;
@@ -725,7 +751,7 @@ function filaEdad(){
    cualquiera de los F.*), en cualquier pestaña que filtre — incluidas
    Re-Mfg, Consig. y Movim., que solo usan el buscador de texto. */
 function barraLimpiar(){
-  const hayFiltro = filtro || F.tipo || F.posicion || F.marca || F.parteTipo || F.car1 || F.car2 || F.car3 || F.edad;
+  const hayFiltro = filtro || F.tipo || F.posicion || F.marca || F.modelo || F.parteTipo || F.car1 || F.car2 || F.car3 || F.edad;
   if(!hayFiltro) return '';
   return `<div class="fila-filtro" style="justify-content:flex-end">
     <button class="filtro-btn" onclick="limpiarFiltros()" style="border-color:var(--naranja);color:var(--naranja)">✕ Limpiar filtros</button>
@@ -750,6 +776,9 @@ function renderFiltros(){
         <span class="filtro-label" style="margin-left:6px">Marca:</span>
         ${MARCAS_CABEZA.map(m=>`
           <button class="filtro-btn${F.marca===m?' marca-on':''}" onclick="setF('marca','${m}')">${m}</button>`).join('')}
+      </div>
+      <div class="fila-filtro" style="gap:4px">
+        <input placeholder="Buscar por modelo…" value="${esc(F.modelo)}" oninput="setFTexto('modelo',this.value)" style="flex:1;padding:5px 8px;font-size:12px;border-radius:16px;border:1.5px solid #3C4148;background:#31363D;color:#fff;text-transform:uppercase">
       </div>
       ${filaEdad()}
       ${barraOrden()}
@@ -801,7 +830,7 @@ function setFTexto(key, val){
    Diferenciales, no encontrarlo, y pasar a Partes con la misma
    búsqueda ya aplicada en vez de tener que volver a escribirla. */
 function limpiarFiltrosEstructurados(){
-  F = {tipo:'',posicion:'',marca:'',parteTipo:'',car1:'',car2:'',car3:'',edad:''};
+  F = {tipo:'',posicion:'',marca:'',modelo:'',parteTipo:'',car1:'',car2:'',car3:'',edad:''};
   partesLimite = PARTES_POR_PAGINA;
 }
 /* Limpia todo, incluido el buscador de texto — la del botón "✕ Limpiar filtros". */
@@ -822,8 +851,24 @@ function chips(cars){
 const miniFoto = o => o.foto ? `<img class="foto-mini" src="${esc(o.foto)}" onclick="verFoto('${esc(o.foto)}')" alt="foto">` : '';
 
 function render(){
+  renderSubnav();
   renderFiltros();
   renderVista();
+}
+/* Fila de sub-pestañas de la página activa (Núcleos/Partes/Pivot/Resumen,
+   etc.) — mismo estilo que ya usan Consig. y Masiva para sus sub-vistas.
+   Se oculta si la página solo tiene una pestaña visible para este rol. */
+const SUBNAV_ICONOS = { nucleos:'⚙',partes:'🔩',pivot:'📊',resumen:'▦',remfg:'🔧',cons:'🏪',movs:'↔',categorias:'🚦',ciclico:'🔄',masiva:'🧰' };
+const SUBNAV_LABELS = { nucleos:'Núcleos',partes:'Partes',pivot:'Pivot',resumen:'Resumen',remfg:'Re-Mfg',cons:'Consig.',movs:'Movim.',categorias:'Categ.',ciclico:'Cíclico',masiva:'Masiva' };
+function renderSubnav(){
+  const wrap = $('#subnav-wrap');
+  const pagina = PAGINAS[paginaDeTab(tab)];
+  const visibles = pagina.tabs.filter(tabVisible);
+  if(visibles.length<=1){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = `<div class="subnav">${visibles.map(t=>`
+    <button class="subnav-btn${tab===t?' on':''}" onclick="irATab('${t}')">
+      <span class="ic">${SUBNAV_ICONOS[t]}</span>${SUBNAV_LABELS[t]}
+    </button>`).join('')}</div>`;
 }
 /* Solo repinta la lista de la pestaña activa, sin tocar la barra de
    filtros — así los inputs de texto (car1/car2/car3) no pierden el foco
@@ -882,9 +927,9 @@ function renderVista(){
         </div>`}
       </div>`;
     }).join('') :
-    `<div class="vacio"><b>Sin núcleos${(filtro||F.tipo||F.posicion||F.marca||F.edad)?' que coincidan':''}</b>
+    `<div class="vacio"><b>Sin núcleos${(filtro||F.tipo||F.posicion||F.marca||F.modelo||F.edad)?' que coincidan':''}</b>
       ${F.edad?`<div style="margin:6px 0;font-size:13px">Filtro activo: antigüedad <b>${EDAD_RANGOS.find(r=>r.key===F.edad)?.label||F.edad}</b></div>`:''}
-      ${(F.tipo||F.posicion||F.marca||F.edad)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--azul);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Toca + para registrar la primera transmisión o diferencial.'}
+      ${(F.tipo||F.posicion||F.marca||F.modelo||F.edad)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--azul);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Toca + para registrar la primera transmisión o diferencial.'}
     </div>`);
   }
 
@@ -925,6 +970,40 @@ function renderVista(){
       ${F.edad?`<div style="margin:6px 0;font-size:13px">Filtro activo: antigüedad <b>${EDAD_RANGOS.find(r=>r.key===F.edad)?.label||F.edad}</b></div>`:''}
       ${(F.parteTipo||F.car1||F.car2||F.car3||F.edad)?`<button onclick="limpiarFiltros()" style="margin-top:10px;padding:8px 16px;background:var(--naranja);color:#fff;border:none;border-radius:8px;cursor:pointer">Limpiar filtros</button>`:'Desarma un núcleo o toca + para registrar una parte suelta.'}
     </div>`);
+  }
+
+  else if(tab==='pivot'){
+    const categoria = pivotCategoria;
+    const esNucleo = categoria!=='partes';
+    const base = categoria==='diferencial' ? D.nucleos.filter(n=>n.tipo==='Diferencial')
+               : categoria==='transmision' ? D.nucleos.filter(n=>n.tipo==='Transmisión')
+               : D.partes;
+    const items = base.filter(it=>coincideTexto(it));
+    const campos = PIVOT_CAMPOS[categoria];
+    const { nivel1, nivel2 } = pivotNivelesActuales(categoria);
+    const grupos = calcularPivot(items, nivel1, nivel2, esNucleo);
+    pivotUltimosGrupos = grupos;
+
+    v.innerHTML = `
+      <div class="seccion-t">📊 Pivot de inventario</div>
+      <div class="fila-filtro">
+        ${[['diferencial','Diferencial'],['transmision','Transmisión'],['partes','# Partes']].map(([k,l])=>`
+          <button class="filtro-btn${categoria===k?' on':''}" onclick="pivotCategoria='${k}';pivotColapsados=new Set();renderVista()">${l}</button>`).join('')}
+      </div>
+      ${esAdmin() ? `
+      <div class="fila2" style="margin-top:10px">
+        <div><label>Agrupar por (nivel 1)</label>
+          <select onchange="pivotCambiarNivel(1,this.value)">
+            ${campos.map(c=>`<option value="${c}" ${c===nivel1?'selected':''}>${PIVOT_CAMPO_LABEL[c]}</option>`).join('')}
+          </select></div>
+        <div><label>Luego por (nivel 2)</label>
+          <select onchange="pivotCambiarNivel(2,this.value)">
+            ${campos.map(c=>`<option value="${c}" ${c===nivel2?'selected':''}>${PIVOT_CAMPO_LABEL[c]}</option>`).join('')}
+          </select></div>
+      </div>` : `<div class="meta" style="margin:8px 0">Agrupado por <b>${PIVOT_CAMPO_LABEL[nivel1]}</b> → <b>${PIVOT_CAMPO_LABEL[nivel2]}</b>. Solo el admin puede cambiar esto.</div>`}
+
+      <div class="meta" style="margin:10px 0 4px">${items.length} registro${items.length!==1?'s':''}${filtro?' (filtrado por la búsqueda de arriba)':''}</div>
+      ${renderPivotTabla(grupos)}`;
   }
 
   else if(tab==='remfg'){
@@ -1680,6 +1759,91 @@ async function masConfirmarConsig(){
       render(); pintarUbic();
     }
   );
+}
+
+/* =====================================================================
+   PIVOT DE INVENTARIO
+   ===================================================================== */
+/* Campos disponibles para agrupar, según la categoría activa. Los
+   núcleos de diferencial/transmisión no tienen "Tipo" variable (ya está
+   fijo por la categoría elegida), así que no se ofrece ahí. */
+const PIVOT_CAMPOS = {
+  diferencial: ['modelo','marca','ubic','estado','car1','car2','car3','car4','car5'],
+  transmision: ['modelo','marca','ubic','estado','car1','car2','car3','car4','car5'],
+  partes:      ['tipo','ubic','estado','car1','car2','car3','car4','car5']
+};
+const PIVOT_CAMPO_LABEL = {
+  tipo:'Tipo', modelo:'Modelo', marca:'Marca', ubic:'Ubicación', estado:'Estado / Condición',
+  car1:'Característica 1', car2:'Característica 2', car3:'Característica 3', car4:'Característica 4', car5:'Característica 5'
+};
+const PIVOT_DEFAULT = {
+  diferencial: ['modelo','car1'],
+  transmision: ['modelo','car1'],
+  partes:      ['car1','tipo']
+};
+function campoValorPivot(item, campo, esNucleo){
+  if(campo==='tipo')   return item.tipo   || 'SIN TIPO';
+  if(campo==='modelo') return item.modelo || 'SIN MODELO';
+  if(campo==='marca')  return item.marca  || 'SIN MARCA';
+  if(campo==='ubic')   return item.ubic   || 'SIN UBICACIÓN';
+  if(campo==='estado') return esNucleo ? (item.estado||'SIN ESTADO') : (item.cond||'SIN CONDICIÓN');
+  if(campo.startsWith('car')){
+    const idx = parseInt(campo.slice(3),10)-1;
+    const c = (item.cars||[])[idx];
+    if(!c || !c.v) return '(SIN DATO)';
+    return `${c.n||('CAR'+(idx+1))}: ${c.v}`;
+  }
+  return '(SIN DATO)';
+}
+function calcularPivot(items, nivel1, nivel2, esNucleo){
+  const mapa = new Map();
+  items.forEach(it=>{
+    const c1 = campoValorPivot(it, nivel1, esNucleo);
+    const c2 = campoValorPivot(it, nivel2, esNucleo);
+    if(!mapa.has(c1)) mapa.set(c1, { total:0, subs:new Map() });
+    const g = mapa.get(c1);
+    g.total++;
+    g.subs.set(c2, (g.subs.get(c2)||0)+1);
+  });
+  return [...mapa.entries()]
+    .map(([clave,g])=>({
+      clave, total:g.total,
+      subs:[...g.subs.entries()].map(([c,n])=>({clave:c, total:n})).sort((a,b)=>b.total-a.total)
+    }))
+    .sort((a,b)=>b.total-a.total);
+}
+function pivotNivelesActuales(categoria){
+  const cfg = (D.config.pivot && D.config.pivot[categoria]) || {};
+  return {
+    nivel1: cfg.nivel1 || PIVOT_DEFAULT[categoria][0],
+    nivel2: cfg.nivel2 || PIVOT_DEFAULT[categoria][1]
+  };
+}
+async function pivotCambiarNivel(nivel, valor){
+  if(!esAdmin()) return;
+  const actuales = pivotNivelesActuales(pivotCategoria);
+  const nuevo = { nivel1: nivel===1?valor:actuales.nivel1, nivel2: nivel===2?valor:actuales.nivel2 };
+  if(!D.config.pivot) D.config.pivot = { id:'pivot' };
+  D.config.pivot[pivotCategoria] = nuevo;
+  pivotColapsados = new Set();
+  await persistir('config', D.config.pivot);
+  render();
+}
+function pivotToggleGrupo(idx){
+  if(pivotColapsados.has(idx)) pivotColapsados.delete(idx); else pivotColapsados.add(idx);
+  renderVista();
+}
+function renderPivotTabla(grupos){
+  if(!grupos.length) return `<div class="vacio">Sin datos para esta categoría.</div>`;
+  return grupos.map((g,i)=>{
+    const colapsado = pivotColapsados.has(i);
+    return `<div class="pivot-grupo">
+      <div class="pivot-fila pivot-n1" onclick="pivotToggleGrupo(${i})">
+        <span>${colapsado?'▸':'▾'} ${esc(g.clave)}</span><span class="pivot-cnt">${g.total}</span>
+      </div>
+      ${!colapsado ? g.subs.map(s=>`<div class="pivot-fila pivot-n2"><span>${esc(s.clave)}</span><span class="pivot-cnt">${s.total}</span></div>`).join('') : ''}
+    </div>`;
+  }).join('');
 }
 
 /* =====================================================================
@@ -2849,8 +3013,17 @@ function exportar(){
 /* =====================================================================
    NAVEGACIÓN
    ===================================================================== */
-function marcarTab(){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
-document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{ tab=b.dataset.tab; limpiarFiltrosEstructurados(); marcarTab(); render(); });
+function marcarTab(){
+  const pag = paginaDeTab(tab);
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.pagina===pag));
+}
+document.querySelectorAll('nav button').forEach(b=> b.onclick=()=>{
+  const visibles = PAGINAS[b.dataset.pagina].tabs.filter(tabVisible);
+  if(!visibles.includes(tab)) tab = visibles[0];
+  limpiarFiltrosEstructurados(); marcarTab(); render(); pintarUbic();
+});
+/* Cambia de pestaña DENTRO de la página activa (fila de sub-pestañas). */
+function irATab(t){ tab = t; limpiarFiltrosEstructurados(); marcarTab(); render(); pintarUbic(); }
 $('#fab').onclick = ()=> tab==='partes' ? formParte('') : formNucleo();
 $('#search').oninput = e=>{ filtro=e.target.value.toUpperCase(); partesLimite=PARTES_POR_PAGINA; renderTrasBusquedaDebounced(); };
 $('#recargar').onclick = ()=> cargar();

@@ -20,6 +20,9 @@
     </div>
   </header>
 
+  <!-- SUB-NAVEGACIÓN — pestañas de la página activa -->
+  <div id="subnav-wrap"></div>
+
   <!-- BLOQUE DE FILTROS — se actualiza según la pestaña activa -->
   <div id="filtros-wrap"></div>
 
@@ -28,15 +31,9 @@
   <button id="fab" title="Agregar">+</button>
 
   <nav>
-    <button data-tab="nucleos" class="on"><span class="ic">⚙</span>Núcleos</button>
-    <button data-tab="partes"><span class="ic">🔩</span>Partes</button>
-    <button data-tab="remfg"><span class="ic">🔧</span>Re-Mfg</button>
-    <button data-tab="cons"><span class="ic">🏪</span>Consig.</button>
-    <button data-tab="movs"><span class="ic">↔</span>Movim.</button>
-    <button data-tab="resumen"><span class="ic">▦</span>Resumen</button>
-    <button data-tab="categorias" id="nav-categorias" style="display:none"><span class="ic">🚦</span>Categ.</button>
-    <button data-tab="ciclico" id="nav-ciclico" style="display:none"><span class="ic">🔄</span>Cíclico</button>
-    <button data-tab="masiva" id="nav-masiva" style="display:none"><span class="ic">🧰</span>Masiva</button>
+    <button data-pagina="inventario" class="on"><span class="ic">📦</span>Inventario</button>
+    <button data-pagina="traslados"><span class="ic">🚚</span>Traslados</button>
+    <button data-pagina="funciones" id="nav-funciones" style="display:none"><span class="ic">🛠</span>Funciones</button>
   </nav>
 </div>
 
