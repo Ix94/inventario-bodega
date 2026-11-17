@@ -1003,6 +1003,10 @@ function renderVista(){
       </div>` : `<div class="meta" style="margin:8px 0">Agrupado por <b>${PIVOT_CAMPO_LABEL[nivel1]}</b> → <b>${PIVOT_CAMPO_LABEL[nivel2]}</b>. Solo el admin puede cambiar esto.</div>`}
 
       <div class="meta" style="margin:10px 0 4px">${items.length} registro${items.length!==1?'s':''}${filtro?' (filtrado por la búsqueda de arriba)':''}</div>
+      ${grupos.length ? `<div class="fila-filtro">
+        <button class="filtro-btn" onclick="pivotColapsarTodo()">▸ Colapsar todo</button>
+        <button class="filtro-btn" onclick="pivotDesplegarTodo()">▾ Desplegar todo</button>
+      </div>` : ''}
       ${renderPivotTabla(grupos)}`;
   }
 
@@ -1831,6 +1835,14 @@ async function pivotCambiarNivel(nivel, valor){
 }
 function pivotToggleGrupo(idx){
   if(pivotColapsados.has(idx)) pivotColapsados.delete(idx); else pivotColapsados.add(idx);
+  renderVista();
+}
+function pivotColapsarTodo(){
+  pivotColapsados = new Set(pivotUltimosGrupos.map((g,i)=>i));
+  renderVista();
+}
+function pivotDesplegarTodo(){
+  pivotColapsados = new Set();
   renderVista();
 }
 function renderPivotTabla(grupos){
